@@ -9,8 +9,26 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
     
-    <!-- ดึงไฟล์ css.html เข้ามา -->
-    <?!= include('css'); ?>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+        .day-cell { transition: all 0.2s ease-in-out; }
+        .day-cell:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.08); z-index: 10; }
+        .event-dots-container { display: flex; gap: 4px; justify-content: center; margin-top: auto; margin-bottom: 4px; flex-wrap: wrap; }
+        .event-dot { width: 7px; height: 7px; border-radius: 50%; }
+        .modal-content { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .gemini-content p { margin-bottom: 0.75rem; }
+        .gemini-content h3 { font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1.1rem; color: #1e293b; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 
 </head>
 <body class="bg-slate-100 text-slate-800">
@@ -216,7 +234,7 @@
 
     <script>
         // =================================================================
-        // 1. STATE & CONFIGURATION
+        // 1. STATE & CONFIGURATION (state.js)
         // =================================================================
         const appState = {
             currentDate: new Date(),
@@ -228,7 +246,7 @@
         };
 
         const appConfig = {
-            appScriptUrl: 'YOUR_BACKEND_URL_HERE', // ❗❗❗ สำคัญ: กรุณาใส่ URL ของ Back-end Apps Script ของคุณที่นี่
+            appScriptUrl: 'https://script.google.com/macros/s/AKfycbz6OU4YPEfpO6OASHfR2g3bX6_8pHkSCGbyCEVLQcUI-6N0q4XORSG__y5uMA5ZVNdf/exec',
             thaiMonths: ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"],
             dayMap: { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 0 },
             categoryColors: {
@@ -240,516 +258,515 @@
         const appDom = {};
 
         // =================================================================
-        // 2. UI FUNCTIONS
+        // 2. UI MODULE (ui.js)
         // =================================================================
-        function showLoader(show) {
-            if (appDom.globalLoader) appDom.globalLoader.classList.toggle('hidden', !show);
-        }
-
-        function showLoginStep(step) {
-            if (appDom.emailStep) appDom.emailStep.classList.toggle('hidden', step !== 'email');
-            if (appDom.otpStep) appDom.otpStep.classList.toggle('hidden', step !== 'otp');
-        }
-
-        function toggleModal(modalId, show) {
-            const modal = document.getElementById(modalId);
-            if (modal) modal.classList.toggle('hidden', !show);
-        }
-        
-        function showStatusBox(message, type = 'success') {
-            if (!appDom.statusBox || !appDom.statusText) return;
-            appDom.statusText.textContent = message;
-            appDom.statusBox.className = `fixed bottom-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-all z-[100] ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
-            appDom.statusBox.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => appDom.statusBox.classList.add('translate-y-20', 'opacity-0'), 3000);
-        }
-
-        // =================================================================
-        // 3. API FUNCTIONS
-        // =================================================================
-        async function callGemini(prompt, useJson = false) {
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-            if (useJson) {
-                payload.generationConfig = {
-                    responseMimeType: "application/json",
-                    responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { day: { type: "STRING" }, time: { type: "STRING" }, title: { type: "STRING" } }, required: ["day", "time", "title"] } }
-                };
+        const ui = {
+            showLoader: function(show) { if (appDom.globalLoader) appDom.globalLoader.classList.toggle('hidden', !show); },
+            showLoginStep: function(step) {
+                if (appDom.emailStep) appDom.emailStep.classList.toggle('hidden', step !== 'email');
+                if (appDom.otpStep) appDom.otpStep.classList.toggle('hidden', step !== 'otp');
+            },
+            toggleModal: function(modalId, show) {
+                const modal = document.getElementById(modalId);
+                if (modal) modal.classList.toggle('hidden', !show);
+            },
+            showStatusBox: function(message, type = 'success') {
+                if (!appDom.statusBox || !appDom.statusText) return;
+                appDom.statusText.textContent = message;
+                appDom.statusBox.className = `fixed bottom-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-all z-[100] ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+                appDom.statusBox.classList.remove('translate-y-20', 'opacity-0');
+                setTimeout(() => appDom.statusBox.classList.add('translate-y-20', 'opacity-0'), 3000);
             }
-            try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API call failed: ${response.status}`);
-                const result = await response.json();
-                return result.candidates?.[0]?.content?.parts?.[0]?.text;
-            } catch (error) {
-                console.error("Gemini API call error:", error);
-                showStatusBox('ไม่สามารถติดต่อ Gemini API ได้', 'error');
-                return null;
-            }
-        }
+        };
 
-        async function callAppScript(payload) {
-            showLoader(true);
-            try {
-                const noAuthActions = ['requestOTP', 'verifyOTP'];
-                if (!noAuthActions.includes(payload.action)) {
-                    payload.sessionToken = localStorage.getItem('calendarSessionToken');
-                    payload.email = localStorage.getItem('calendarUserEmail');
+        // =================================================================
+        // 3. API MODULE (api.js)
+        // =================================================================
+        const api = {
+            callGemini: async function(prompt, useJson = false) {
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                if (useJson) {
+                    payload.generationConfig = {
+                        responseMimeType: "application/json",
+                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { day: { type: "STRING" }, time: { type: "STRING" }, title: { type: "STRING" } }, required: ["day", "time", "title"] } }
+                    };
                 }
-                const response = await fetch(appConfig.appScriptUrl, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(payload) 
-                });
-                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-                const result = await response.json();
-                if (result.status === 'error' && (result.message.includes('เซสชัน') || result.message.includes('ยืนยันตัวตน'))) {
-                   logout();
-                   throw new Error('Session invalid, logging out.');
-                }
-                return result;
-            } catch (error) {
-                console.error('API Call failed:', error);
-                throw error;
-            } finally {
-                showLoader(false);
-            }
-        }
-        
-        // =================================================================
-        // 4. AUTHENTICATION FUNCTIONS
-        // =================================================================
-        async function initializeApp() {
-            const storedEmail = localStorage.getItem('calendarUserEmail');
-            const storedToken = localStorage.getItem('calendarSessionToken');
-            if (storedEmail && storedToken) {
                 try {
-                    const response = await callAppScript({ action: 'verifySession', email: storedEmail, sessionToken: storedToken });
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
+                } catch (error) {
+                    console.error("Gemini API call error:", error);
+                    ui.showStatusBox('ไม่สามารถติดต่อ Gemini API ได้', 'error');
+                    return null;
+                }
+            },
+            callAppScript: async function(payload) {
+                ui.showLoader(true);
+                try {
+                    const noAuthActions = ['requestOTP', 'verifyOTP'];
+                    if (!noAuthActions.includes(payload.action)) {
+                        payload.sessionToken = localStorage.getItem('calendarSessionToken');
+                        payload.email = localStorage.getItem('calendarUserEmail');
+                    }
+                    const response = await fetch(appConfig.appScriptUrl, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                    const result = await response.json();
+                    if (result.status === 'error' && (result.message.includes('เซสชัน') || result.message.includes('ยืนยันตัวตน'))) {
+                       auth.logout();
+                       throw new Error('Session invalid, logging out.');
+                    }
+                    return result;
+                } catch (error) {
+                    console.error('API Call failed:', error);
+                    throw error;
+                } finally {
+                    ui.showLoader(false);
+                }
+            }
+        };
+
+        // =================================================================
+        // 4. AUTH MODULE (auth.js)
+        // =================================================================
+        const auth = {
+            initializeApp: async function() {
+                const storedEmail = localStorage.getItem('calendarUserEmail');
+                const storedToken = localStorage.getItem('calendarSessionToken');
+                if (storedEmail && storedToken) {
+                    try {
+                        const response = await api.callAppScript({ action: 'verifySession', email: storedEmail, sessionToken: storedToken });
+                        if (response.status === 'success') {
+                            appState.userEmail = storedEmail;
+                            startApp();
+                            return;
+                        }
+                    } catch (error) { /* Handled */ }
+                }
+                auth.logout(false);
+            },
+            logout: function(showMessage = true) {
+                localStorage.removeItem('calendarUserEmail');
+                localStorage.removeItem('calendarSessionToken');
+                appState.userEmail = null;
+                appState.events = [];
+                if (appState.autoRefreshInterval) clearInterval(appState.autoRefreshInterval);
+                if (appDom.appContainer) appDom.appContainer.classList.add('hidden');
+                if (appDom.loginModal) appDom.loginModal.classList.remove('hidden');
+                ui.showLoginStep('email');
+                if (showMessage) ui.showStatusBox('ออกจากระบบสำเร็จแล้ว');
+            },
+            handleEmailSubmit: async function(e) {
+                e.preventDefault();
+                const email = appDom.userEmailInput.value;
+                if (!email) return;
+                try {
+                    const response = await api.callAppScript({ action: 'requestOTP', email: email });
                     if (response.status === 'success') {
-                        appState.userEmail = storedEmail;
-                        startApp();
-                        return;
-                    }
-                } catch (error) { /* Handled in callAppScript */ }
-            }
-            logout(false);
-        }
-
-        function logout(showMessage = true) {
-            localStorage.removeItem('calendarUserEmail');
-            localStorage.removeItem('calendarSessionToken');
-            appState.userEmail = null;
-            appState.events = [];
-            if (appState.autoRefreshInterval) clearInterval(appState.autoRefreshInterval);
-            if (appDom.appContainer) appDom.appContainer.classList.add('hidden');
-            if (appDom.loginModal) appDom.loginModal.classList.remove('hidden');
-            showLoginStep('email');
-            if (showMessage) showStatusBox('ออกจากระบบสำเร็จแล้ว');
-        }
-
-        async function handleEmailSubmit(e) {
-            e.preventDefault();
-            const email = appDom.userEmailInput.value;
-            if (!email) return;
-            try {
-                const response = await callAppScript({ action: 'requestOTP', email: email });
-                if (response.status === 'success') {
-                    appDom.otpEmailDisplay.textContent = email;
-                    showLoginStep('otp');
-                } else {
-                    showStatusBox(response.message || 'เกิดข้อผิดพลาดในการส่ง OTP', 'error');
-                }
-            } catch (error) {
-                showStatusBox('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
-            }
-        }
-
-        async function handleOtpSubmit(e) {
-            e.preventDefault();
-            const email = appDom.userEmailInput.value;
-            const otp = appDom.otpInput.value;
-            if (!email || !otp) return;
-            try {
-                const response = await callAppScript({ action: 'verifyOTP', email: email, otp: otp });
-                if (response.status === 'success' && response.sessionToken) {
-                    localStorage.setItem('calendarUserEmail', email);
-                    localStorage.setItem('calendarSessionToken', response.sessionToken);
-                    appState.userEmail = email;
-                    appDom.otpInput.value = '';
-                    startApp();
-                } else {
-                    showStatusBox(response.message || 'OTP ไม่ถูกต้อง', 'error');
-                }
-            } catch (error) {
-                showStatusBox('การยืนยัน OTP ล้มเหลว', 'error');
-            }
-        }
-
-        // =================================================================
-        // 5. CALENDAR FUNCTIONS
-        // =================================================================
-        function renderCalendar() {
-            updateMonthYearDisplay();
-            const { year, month } = { year: appState.currentDate.getFullYear(), month: appState.currentDate.getMonth() };
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            if (appDom.calendarBody) appDom.calendarBody.innerHTML = '';
-            if (appDom.calendarBodyMobile) appDom.calendarBodyMobile.innerHTML = '';
-            let date = 1;
-            for (let i = 0; i < 6; i++) {
-                if (date > daysInMonth) break;
-                for (let j = 0; j < 7; j++) {
-                    let cellNode;
-                    if (i === 0 && j < firstDay) {
-                        cellNode = createDayCell();
-                    } else if (date <= daysInMonth) {
-                        cellNode = createDayCell(new Date(year, month, date));
-                        date++;
+                        appDom.otpEmailDisplay.textContent = email;
+                        ui.showLoginStep('otp');
                     } else {
-                        cellNode = createDayCell();
+                        ui.showStatusBox(response.message || 'เกิดข้อผิดพลาดในการส่ง OTP', 'error');
                     }
-                    if (cellNode) {
-                       if (appDom.calendarBody) appDom.calendarBody.appendChild(cellNode.cloneNode(true));
-                       if (appDom.calendarBodyMobile) appDom.calendarBodyMobile.appendChild(cellNode.cloneNode(true));
+                } catch (error) {
+                    ui.showStatusBox('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                }
+            },
+            handleOtpSubmit: async function(e) {
+                e.preventDefault();
+                const email = appDom.userEmailInput.value;
+                const otp = appDom.otpInput.value;
+                if (!email || !otp) return;
+                try {
+                    const response = await api.callAppScript({ action: 'verifyOTP', email: email, otp: otp });
+                    if (response.status === 'success' && response.sessionToken) {
+                        localStorage.setItem('calendarUserEmail', email);
+                        localStorage.setItem('calendarSessionToken', response.sessionToken);
+                        appState.userEmail = email;
+                        appDom.otpInput.value = '';
+                        startApp();
+                    } else {
+                        ui.showStatusBox(response.message || 'OTP ไม่ถูกต้อง', 'error');
                     }
+                } catch (error) {
+                    ui.showStatusBox('การยืนยัน OTP ล้มเหลว', 'error');
                 }
             }
-        }
+        };
 
-        function createDayCell(dateObj) {
-            const cell = document.createElement('div');
-            if (!dateObj) {
-                cell.className = 'bg-slate-50 rounded-lg';
+        // =================================================================
+        // 5. CALENDAR MODULE (calendar.js)
+        // =================================================================
+        const calendar = {
+            render: function() {
+                this.updateMonthYearDisplay();
+                const { year, month } = { year: appState.currentDate.getFullYear(), month: appState.currentDate.getMonth() };
+                const firstDay = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                if (appDom.calendarBody) appDom.calendarBody.innerHTML = '';
+                if (appDom.calendarBodyMobile) appDom.calendarBodyMobile.innerHTML = '';
+                let date = 1;
+                for (let i = 0; i < 6; i++) {
+                    if (date > daysInMonth) break;
+                    for (let j = 0; j < 7; j++) {
+                        let cellNode;
+                        if (i === 0 && j < firstDay) {
+                            cellNode = this.createDayCell();
+                        } else if (date <= daysInMonth) {
+                            cellNode = this.createDayCell(new Date(year, month, date));
+                            date++;
+                        } else {
+                            cellNode = this.createDayCell();
+                        }
+                        if (cellNode) {
+                           if (appDom.calendarBody) appDom.calendarBody.appendChild(cellNode.cloneNode(true));
+                           if (appDom.calendarBodyMobile) appDom.calendarBodyMobile.appendChild(cellNode.cloneNode(true));
+                        }
+                    }
+                }
+            },
+            createDayCell: function(dateObj) {
+                const cell = document.createElement('div');
+                if (!dateObj) {
+                    cell.className = 'bg-slate-50 rounded-lg';
+                    return cell;
+                }
+                const day = dateObj.getDate();
+                const dateString = utils.formatDate(dateObj);
+                cell.className = 'day-cell flex flex-col items-center justify-start p-1 sm:p-2 cursor-pointer rounded-lg relative';
+                cell.dataset.date = dateString;
+                const dateSpan = document.createElement('span');
+                dateSpan.textContent = day;
+                dateSpan.className = 'flex items-center justify-center w-7 h-7 rounded-full mb-1 sm:text-base text-xs';
+                if (dateString === utils.formatDate(new Date())) {
+                    cell.classList.add('bg-indigo-100');
+                    dateSpan.classList.add('bg-indigo-600', 'text-white', 'font-bold');
+                } else {
+                    cell.classList.add('bg-white', 'hover:bg-slate-100');
+                }
+                cell.appendChild(dateSpan);
+                const eventsForDay = appState.events.filter(e => e.date === dateString);
+                if (eventsForDay.length > 0) {
+                    const dotsContainer = document.createElement('div');
+                    dotsContainer.className = 'event-dots-container';
+                    eventsForDay.slice(0, 3).forEach(event => {
+                        const dot = document.createElement('div');
+                        dot.className = `event-dot ${appConfig.categoryColors[event.category] || 'bg-slate-400'}`;
+                        dotsContainer.appendChild(dot);
+                    });
+                    cell.appendChild(dotsContainer);
+                }
                 return cell;
+            },
+            updateMonthYearDisplay: function() {
+                const monthName = appConfig.thaiMonths[appState.currentDate.getMonth()];
+                const year = appState.currentDate.getFullYear() + 543;
+                const text = `${monthName} ${year}`;
+                if (appDom.monthYear) appDom.monthYear.textContent = text;
+                if (appDom.monthYearMobile) appDom.monthYearMobile.textContent = text;
+            },
+            changeMonth: function(offset) {
+                appState.currentDate.setMonth(appState.currentDate.getMonth() + offset);
+                this.render();
             }
-            const day = dateObj.getDate();
-            const dateString = formatDate(dateObj);
-            cell.className = 'day-cell flex flex-col items-center justify-start p-1 sm:p-2 cursor-pointer rounded-lg relative';
-            cell.dataset.date = dateString;
-            const dateSpan = document.createElement('span');
-            dateSpan.textContent = day;
-            dateSpan.className = 'flex items-center justify-center w-7 h-7 rounded-full mb-1 sm:text-base text-xs';
-            if (dateString === formatDate(new Date())) {
-                cell.classList.add('bg-indigo-100');
-                dateSpan.classList.add('bg-indigo-600', 'text-white', 'font-bold');
-            } else {
-                cell.classList.add('bg-white', 'hover:bg-slate-100');
-            }
-            cell.appendChild(dateSpan);
-            const eventsForDay = appState.events.filter(e => e.date === dateString);
-            if (eventsForDay.length > 0) {
-                const dotsContainer = document.createElement('div');
-                dotsContainer.className = 'event-dots-container';
-                eventsForDay.slice(0, 3).forEach(event => {
-                    const dot = document.createElement('div');
-                    dot.className = `event-dot ${appConfig.categoryColors[event.category] || 'bg-slate-400'}`;
-                    dotsContainer.appendChild(dot);
-                });
-                cell.appendChild(dotsContainer);
-            }
-            return cell;
-        }
-
-        function updateMonthYearDisplay() {
-            const monthName = appConfig.thaiMonths[appState.currentDate.getMonth()];
-            const year = appState.currentDate.getFullYear() + 543;
-            const text = `${monthName} ${year}`;
-            if (appDom.monthYear) appDom.monthYear.textContent = text;
-            if (appDom.monthYearMobile) appDom.monthYearMobile.textContent = text;
-        }
-
-        function changeMonth(offset) {
-            appState.currentDate.setMonth(appState.currentDate.getMonth() + offset);
-            renderCalendar();
-        }
-        
-        // =================================================================
-        // 6. EVENT HANDLING FUNCTIONS
-        // =================================================================
-        async function fetchEvents(showLoader = true) {
-            if (!appState.userEmail) return;
-            try {
-                if(showLoader) showLoader(true);
-                const response = await callAppScript({ action: 'getReminders' });
-                if (response.status === 'success') {
-                    appState.events = response.data;
-                    renderCalendar();
-                    renderUpcoming();
-                }
-            } catch (error) { /* Handled */ } 
-            finally { if(showLoader) showLoader(false); }
-        }
-
-        async function saveEvent(e) {
-            e.preventDefault();
-            const eventId = appDom.eventId.value;
-            const payload = {
-                action: eventId ? 'updateReminder' : 'saveReminder',
-                id: eventId,
-                title: appDom.eventTitle.value,
-                category: appDom.eventCategory.value,
-                date: appDom.eventDate.value,
-                time: appDom.eventTime.value,
-                reminderOffset: appDom.reminderOffset.value,
-            };
-            try {
-                const response = await callAppScript(payload);
-                if (response.status === 'success') {
-                    toggleModal('event-modal', false);
-                    showStatusBox('บันทึกการแจ้งเตือนสำเร็จ');
-                    fetchEvents();
-                } else {
-                    showStatusBox(response.message || 'บันทึกไม่สำเร็จ', 'error');
-                }
-            } catch (error) {
-                showStatusBox('เกิดข้อผิดพลาดในการบันทึก', 'error');
-            }
-        }
-
-        async function deleteEvent(eventId) {
-            try {
-                const response = await callAppScript({ action: 'deleteReminder', id: eventId });
-                if (response.status === 'success') {
-                    showStatusBox('ลบการแจ้งเตือนแล้ว');
-                    fetchEvents();
-                } else {
-                    showStatusBox(response.message || 'ลบไม่สำเร็จ', 'error');
-                }
-            } catch(error) {
-                showStatusBox('เกิดข้อผิดพลาดในการลบ', 'error');
-            }
-        }
-
-        function openEventModal(event = null) {
-            appDom.eventForm.reset();
-            if (event) {
-                appDom.eventModalTitle.textContent = 'แก้ไขการแจ้งเตือน';
-                appDom.eventId.value = event.id;
-                appDom.eventTitle.value = event.title;
-                appDom.eventCategory.value = event.category;
-                appDom.eventDate.value = event.date;
-                appDom.eventTime.value = event.time;
-                appDom.reminderOffset.value = event.reminderOffset;
-            } else {
-                appDom.eventModalTitle.textContent = 'สร้างการแจ้งเตือนใหม่';
-                appDom.eventId.value = '';
-                if (appState.currentSelectedDate) {
-                    appDom.eventDate.value = appState.currentSelectedDate;
-                }
-            }
-            toggleModal('event-modal', true);
-        }
-
-        function openDailyModal(dateString) {
-            appState.currentSelectedDate = dateString;
-            const dateObj = new Date(dateString);
-            appDom.dailyEventsTitle.textContent = `วันที่ ${dateObj.getDate()} ${appConfig.thaiMonths[dateObj.getMonth()]} ${dateObj.getFullYear() + 543}`;
-            const eventsForDay = appState.events.filter(e => e.date === dateString).sort((a,b) => a.time.localeCompare(b.time));
-            const listEl = appDom.dailyEventsList;
-            listEl.innerHTML = '';
-            if (eventsForDay.length > 0) {
-                eventsForDay.forEach(event => listEl.appendChild(createEventListItem(event)));
-            } else {
-                listEl.innerHTML = '<p class="text-slate-500 text-center">ไม่มีการแจ้งเตือนสำหรับวันนี้</p>';
-            }
-            toggleModal('daily-events-modal', true);
-        }
-
-        function renderUpcoming() {
-            const listEl = appDom.upcomingEventsList;
-            if (!listEl) return;
-            listEl.innerHTML = '';
-            const upcomingEvents = appState.events
-                .filter(e => new Date(`${e.date}T${e.time}`) >= new Date())
-                .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
-                .slice(0, 10);
-            if (upcomingEvents.length > 0) {
-                upcomingEvents.forEach(event => listEl.appendChild(createEventListItem(event, true)));
-            } else {
-                listEl.innerHTML = '<p class="text-slate-500 text-center p-4">ไม่มีการแจ้งเตือนที่กำลังจะมาถึง</p>';
-            }
-        }
-
-        function createEventListItem(event, isUpcoming = false) {
-            const item = document.createElement('div');
-            item.className = 'flex items-start space-x-3 p-3 bg-slate-50 rounded-lg';
-            item.innerHTML = `
-                <div class="w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${appConfig.categoryColors[event.category] || 'bg-slate-400'}"></div>
-                <div class="flex-1">
-                    <p class="font-semibold text-slate-800">${event.title}</p>
-                    <p class="text-sm text-slate-500">${isUpcoming ? `${new Date(event.date).getDate()} ${appConfig.thaiMonths[new Date(event.date).getMonth()]}` : ''} ${event.time} น.</p>
-                </div>
-                <div class="flex items-center space-x-1">
-                    <button class="p-1 text-slate-400 hover:text-indigo-600" data-action="editEvent" data-event-id="${event.id}">
-                        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z"></path></svg>
-                    </button>
-                    <button class="p-1 text-slate-400 hover:text-red-600" data-action="deleteEvent" data-event-id="${event.id}">
-                        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </div>`;
-            return item;
-        }
+        };
 
         // =================================================================
-        // 7. FEATURE FUNCTIONS
+        // 6. EVENTS MODULE (events.js)
         // =================================================================
-        async function handleGoalSubmit(e) {
-            e.preventDefault();
-            const idea = appDom.goalIdea.value;
-            if (!idea) return;
-            showLoader(true);
-            const prompt = `Based on the goal "${idea}", create a 7-day plan with specific, actionable tasks for a person in Thailand. Provide exactly 5-7 tasks for the upcoming week, starting from tomorrow. For each task, provide the day of the week (Monday, Tuesday, etc.), a suggested time (HH:MM format, e.g., 08:00, 19:30), and a short, clear title in Thai. Respond ONLY with a JSON array.`;
-            try {
-                const resultText = await callGemini(prompt, true);
-                if (resultText) {
-                    const suggestions = JSON.parse(resultText);
-                    appState.goalSuggestionsCache = suggestions;
-                    renderGoalSuggestions(suggestions);
-                }
-            } catch (error) {
-                console.error("Error parsing Gemini response:", error);
-                showStatusBox('ไม่สามารถสร้างแผนได้', 'error');
-            } finally {
-                showLoader(false);
-            }
-        }
-
-        function renderGoalSuggestions(suggestions) {
-            if (!appDom.goalSuggestions) return;
-            appDom.goalSuggestions.innerHTML = '';
-            if (suggestions && suggestions.length > 0) {
-                suggestions.forEach(s => {
-                    const item = document.createElement('div');
-                    item.className = 'p-3 bg-slate-100 rounded-lg text-left';
-                    item.innerHTML = `<p class="font-semibold text-teal-800">${s.title}</p><p class="text-sm text-slate-600">${translateDay(s.day)} - ${s.time} น.</p>`;
-                    appDom.goalSuggestions.appendChild(item);
-                });
-                if (appDom.goalResultSection) appDom.goalResultSection.classList.remove('hidden');
-            }
-        }
-
-        async function addGoalsToCalendar() {
-            if (appState.goalSuggestionsCache.length === 0) return;
-            showLoader(true);
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const eventsToAdd = appState.goalSuggestionsCache.map(suggestion => {
-                const targetDayIndex = appConfig.dayMap[suggestion.day];
-                if (targetDayIndex === undefined) return null;
-                const daysUntilTarget = (targetDayIndex - dayOfWeek + 7) % 7;
-                const offset = daysUntilTarget === 0 ? 7 : daysUntilTarget;
-                const eventDate = new Date();
-                eventDate.setDate(today.getDate() + offset);
-                return {
-                    action: 'saveReminder', title: suggestion.title, category: 'เป้าหมาย',
-                    date: formatDate(eventDate), time: suggestion.time, reminderOffset: '15'
+        const events = {
+            fetchEvents: async function(showLoader = true) {
+                if (!appState.userEmail) return;
+                try {
+                    if(showLoader) ui.showLoader(true);
+                    const response = await api.callAppScript({ action: 'getReminders' });
+                    if (response.status === 'success') {
+                        appState.events = response.data;
+                        calendar.render();
+                        this.renderUpcoming();
+                    }
+                } catch (error) { /* Handled */ } 
+                finally { if(showLoader) ui.showLoader(false); }
+            },
+            saveEvent: async function(e) {
+                e.preventDefault();
+                const eventId = appDom.eventId.value;
+                const payload = {
+                    action: eventId ? 'updateReminder' : 'saveReminder',
+                    id: eventId,
+                    title: appDom.eventTitle.value,
+                    category: appDom.eventCategory.value,
+                    date: appDom.eventDate.value,
+                    time: appDom.eventTime.value,
+                    reminderOffset: appDom.reminderOffset.value,
                 };
-            }).filter(Boolean);
-            try {
-                const responses = await Promise.all(eventsToAdd.map(p => callAppScript(p)));
-                if (responses.every(res => res.status === 'success')) {
-                    showStatusBox('เพิ่มเป้าหมายลงในปฏิทินแล้ว!');
-                    toggleModal('goal-modal', false);
-                    fetchEvents();
-                } else {
-                    showStatusBox('เกิดข้อผิดพลาดในการบันทึกบางรายการ', 'error');
+                try {
+                    const response = await api.callAppScript(payload);
+                    if (response.status === 'success') {
+                        ui.toggleModal('event-modal', false);
+                        ui.showStatusBox('บันทึกการแจ้งเตือนสำเร็จ');
+                        this.fetchEvents();
+                    } else {
+                        ui.showStatusBox(response.message || 'บันทึกไม่สำเร็จ', 'error');
+                    }
+                } catch (error) {
+                    ui.showStatusBox('เกิดข้อผิดพลาดในการบันทึก', 'error');
                 }
-            } catch (error) {
-                showStatusBox('เกิดข้อผิดพลาดในการบันทึกเป้าหมาย', 'error');
-            } finally {
-                showLoader(false);
-            }
-        }
-
-        async function openSummaryModal() {
-            toggleModal('summary-modal', true);
-            appDom.summaryContent.innerHTML = '<p class="text-center">กำลังสร้างสรุป...</p>';
-            showLoader(true);
-            const today = new Date();
-            const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
-            const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
-            const eventsThisWeek = appState.events.filter(e => {
-                const eventDate = new Date(e.date);
-                return eventDate >= startOfWeek && eventDate <= endOfWeek;
-            });
-            if (eventsThisWeek.length < 3) {
-                appDom.summaryContent.innerHTML = '<p class="text-center text-slate-600">มีกิจกรรมน้อยเกินไปที่จะสร้างสรุป</p>';
-                showLoader(false);
-                return;
-            }
-            const eventListText = eventsThisWeek.map(e => `- ${e.date} ${e.time}: ${e.title} (หมวด: ${e.category})`).join('\n');
-            const prompt = `Here are my calendar events for this week in Thailand:\n${eventListText}\n\nAnalyze these events. Provide a friendly, encouraging summary in Thai. Highlight my productivity, suggest areas for better time management or work-life balance, and identify any patterns. Format the output using simple markdown with headings like '###' and paragraphs. Do not use lists.`;
-            try {
-                const resultText = await callGemini(prompt);
-                if(resultText) {
-                    appDom.summaryContent.innerHTML = resultText.replace(/### (.*)/g, '<h3>$1</h3>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-                } else {
-                     appDom.summaryContent.innerHTML = '<p class="text-center text-red-500">ไม่สามารถสร้างสรุปได้</p>';
+            },
+            deleteEvent: async function(eventId) {
+                try {
+                    const response = await api.callAppScript({ action: 'deleteReminder', id: eventId });
+                    if (response.status === 'success') {
+                        ui.showStatusBox('ลบการแจ้งเตือนแล้ว');
+                        this.fetchEvents();
+                    } else {
+                        ui.showStatusBox(response.message || 'ลบไม่สำเร็จ', 'error');
+                    }
+                } catch(error) {
+                    ui.showStatusBox('เกิดข้อผิดพลาดในการลบ', 'error');
                 }
-            } finally {
-                showLoader(false);
+            },
+            openEventModal: function(event = null) {
+                appDom.eventForm.reset();
+                if (event) {
+                    appDom.eventModalTitle.textContent = 'แก้ไขการแจ้งเตือน';
+                    appDom.eventId.value = event.id;
+                    appDom.eventTitle.value = event.title;
+                    appDom.eventCategory.value = event.category;
+                    appDom.eventDate.value = event.date;
+                    appDom.eventTime.value = event.time;
+                    appDom.reminderOffset.value = event.reminderOffset;
+                } else {
+                    appDom.eventModalTitle.textContent = 'สร้างการแจ้งเตือนใหม่';
+                    appDom.eventId.value = '';
+                    if (appState.currentSelectedDate) {
+                        appDom.eventDate.value = appState.currentSelectedDate;
+                    }
+                }
+                ui.toggleModal('event-modal', true);
+            },
+            openDailyModal: function(dateString) {
+                appState.currentSelectedDate = dateString;
+                const dateObj = new Date(dateString);
+                appDom.dailyEventsTitle.textContent = `วันที่ ${dateObj.getDate()} ${appConfig.thaiMonths[dateObj.getMonth()]} ${dateObj.getFullYear() + 543}`;
+                const eventsForDay = appState.events.filter(e => e.date === dateString).sort((a,b) => a.time.localeCompare(b.time));
+                const listEl = appDom.dailyEventsList;
+                listEl.innerHTML = '';
+                if (eventsForDay.length > 0) {
+                    eventsForDay.forEach(event => listEl.appendChild(this.createEventListItem(event)));
+                } else {
+                    listEl.innerHTML = '<p class="text-slate-500 text-center">ไม่มีการแจ้งเตือนสำหรับวันนี้</p>';
+                }
+                ui.toggleModal('daily-events-modal', true);
+            },
+            renderUpcoming: function() {
+                const listEl = appDom.upcomingEventsList;
+                if (!listEl) return;
+                listEl.innerHTML = '';
+                const upcomingEvents = appState.events
+                    .filter(e => new Date(`${e.date}T${e.time}`) >= new Date())
+                    .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
+                    .slice(0, 10);
+                if (upcomingEvents.length > 0) {
+                    upcomingEvents.forEach(event => listEl.appendChild(this.createEventListItem(event, true)));
+                } else {
+                    listEl.innerHTML = '<p class="text-slate-500 text-center p-4">ไม่มีการแจ้งเตือนที่กำลังจะมาถึง</p>';
+                }
+            },
+            createEventListItem: function(event, isUpcoming = false) {
+                const item = document.createElement('div');
+                item.className = 'flex items-start space-x-3 p-3 bg-slate-50 rounded-lg';
+                item.innerHTML = `
+                    <div class="w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${appConfig.categoryColors[event.category] || 'bg-slate-400'}"></div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-slate-800">${event.title}</p>
+                        <p class="text-sm text-slate-500">${isUpcoming ? `${new Date(event.date).getDate()} ${appConfig.thaiMonths[new Date(event.date).getMonth()]}` : ''} ${event.time} น.</p>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button class="p-1 text-slate-400 hover:text-indigo-600" data-action="editEvent" data-event-id="${event.id}">
+                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z"></path></svg>
+                        </button>
+                        <button class="p-1 text-slate-400 hover:text-red-600" data-action="deleteEvent" data-event-id="${event.id}">
+                            <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>`;
+                return item;
             }
-        }
+        };
 
         // =================================================================
-        // 8. SEARCH AND ACCOUNT FUNCTIONS
+        // 7. FEATURES MODULE (features.js)
         // =================================================================
-        function performSearch(query) {
-            const upcomingList = appDom.upcomingEventsList;
-            const mobileResults = appDom.mobileSearchResults;
-            if (!query || query.length < 2) {
-                renderUpcoming();
-                if(mobileResults) mobileResults.innerHTML = '';
-                return;
-            }
-            const results = appState.events
-                .filter(e => e.title.toLowerCase().includes(query.toLowerCase()) || e.category.toLowerCase().includes(query.toLowerCase()))
-                .sort((a,b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
-            
-            if(upcomingList) upcomingList.innerHTML = '';
-            if(mobileResults) mobileResults.innerHTML = '';
-
-            if (results.length > 0) {
-                results.forEach(event => {
-                     const item = createEventListItem(event, true);
-                     if(upcomingList) upcomingList.appendChild(item.cloneNode(true));
-                     if(mobileResults) mobileResults.appendChild(item);
+        const features = {
+            handleGoalSubmit: async function(e) {
+                e.preventDefault();
+                const idea = appDom.goalIdea.value;
+                if (!idea) return;
+                ui.showLoader(true);
+                const prompt = `Based on the goal "${idea}", create a 7-day plan with specific, actionable tasks for a person in Thailand. Provide exactly 5-7 tasks for the upcoming week, starting from tomorrow. For each task, provide the day of the week (Monday, Tuesday, etc.), a suggested time (HH:MM format, e.g., 08:00, 19:30), and a short, clear title in Thai. Respond ONLY with a JSON array.`;
+                try {
+                    const resultText = await api.callGemini(prompt, true);
+                    if (resultText) {
+                        const suggestions = JSON.parse(resultText);
+                        appState.goalSuggestionsCache = suggestions;
+                        features.renderGoalSuggestions(suggestions);
+                    }
+                } catch (error) {
+                    console.error("Error parsing Gemini response:", error);
+                    ui.showStatusBox('ไม่สามารถสร้างแผนได้', 'error');
+                } finally {
+                    ui.showLoader(false);
+                }
+            },
+            renderGoalSuggestions: function(suggestions) {
+                if (!appDom.goalSuggestions) return;
+                appDom.goalSuggestions.innerHTML = '';
+                if (suggestions && suggestions.length > 0) {
+                    suggestions.forEach(s => {
+                        const item = document.createElement('div');
+                        item.className = 'p-3 bg-slate-100 rounded-lg text-left';
+                        item.innerHTML = `<p class="font-semibold text-teal-800">${s.title}</p><p class="text-sm text-slate-600">${utils.translateDay(s.day)} - ${s.time} น.</p>`;
+                        appDom.goalSuggestions.appendChild(item);
+                    });
+                    if (appDom.goalResultSection) appDom.goalResultSection.classList.remove('hidden');
+                }
+            },
+            addGoalsToCalendar: async function() {
+                if (appState.goalSuggestionsCache.length === 0) return;
+                ui.showLoader(true);
+                const today = new Date();
+                const dayOfWeek = today.getDay();
+                const eventsToAdd = appState.goalSuggestionsCache.map(suggestion => {
+                    const targetDayIndex = appConfig.dayMap[suggestion.day];
+                    if (targetDayIndex === undefined) return null;
+                    const daysUntilTarget = (targetDayIndex - dayOfWeek + 7) % 7;
+                    const offset = daysUntilTarget === 0 ? 7 : daysUntilTarget;
+                    const eventDate = new Date();
+                    eventDate.setDate(today.getDate() + offset);
+                    return {
+                        action: 'saveReminder', title: suggestion.title, category: 'เป้าหมาย',
+                        date: utils.formatDate(eventDate), time: suggestion.time, reminderOffset: '15'
+                    };
+                }).filter(Boolean);
+                try {
+                    const responses = await Promise.all(eventsToAdd.map(p => api.callAppScript(p)));
+                    if (responses.every(res => res.status === 'success')) {
+                        ui.showStatusBox('เพิ่มเป้าหมายลงในปฏิทินแล้ว!');
+                        ui.toggleModal('goal-modal', false);
+                        events.fetchEvents();
+                    } else {
+                        ui.showStatusBox('เกิดข้อผิดพลาดในการบันทึกบางรายการ', 'error');
+                    }
+                } catch (error) {
+                    ui.showStatusBox('เกิดข้อผิดพลาดในการบันทึกเป้าหมาย', 'error');
+                } finally {
+                    ui.showLoader(false);
+                }
+            },
+            openSummaryModal: async function() {
+                ui.toggleModal('summary-modal', true);
+                appDom.summaryContent.innerHTML = '<p class="text-center">กำลังสร้างสรุป...</p>';
+                ui.showLoader(true);
+                const today = new Date();
+                const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+                const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+                const eventsThisWeek = appState.events.filter(e => {
+                    const eventDate = new Date(e.date);
+                    return eventDate >= startOfWeek && eventDate <= endOfWeek;
                 });
-            } else {
-                const noResult = '<p class="text-slate-500 text-center p-4">ไม่พบผลการค้นหา</p>';
-                if(upcomingList) upcomingList.innerHTML = noResult;
-                if(mobileResults) mobileResults.innerHTML = noResult;
-            }
-        }
-
-        async function confirmDelete() {
-             try {
-                const response = await callAppScript({ action: 'deleteUserAccount' });
-                if (response.status === 'success') {
-                    toggleModal('delete-confirm-modal', false);
-                    logout(false);
-                    setTimeout(() => showStatusBox('บัญชีของคุณถูกลบเรียบร้อยแล้ว'), 500);
-                } else {
-                    showStatusBox(response.message || 'ลบบัญชีไม่สำเร็จ', 'error');
+                if (eventsThisWeek.length < 3) {
+                    appDom.summaryContent.innerHTML = '<p class="text-center text-slate-600">มีกิจกรรมน้อยเกินไปที่จะสร้างสรุป</p>';
+                    ui.showLoader(false);
+                    return;
                 }
-            } catch (error) {
-                showStatusBox('เกิดข้อผิดพลาดในการลบบัญชี', 'error');
+                const eventListText = eventsThisWeek.map(e => `- ${e.date} ${e.time}: ${e.title} (หมวด: ${e.category})`).join('\n');
+                const prompt = `Here are my calendar events for this week in Thailand:\n${eventListText}\n\nAnalyze these events. Provide a friendly, encouraging summary in Thai. Highlight my productivity, suggest areas for better time management or work-life balance, and identify any patterns. Format the output using simple markdown with headings like '###' and paragraphs. Do not use lists.`;
+                try {
+                    const resultText = await api.callGemini(prompt);
+                    if(resultText) {
+                        appDom.summaryContent.innerHTML = resultText.replace(/### (.*)/g, '<h3>$1</h3>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                    } else {
+                         appDom.summaryContent.innerHTML = '<p class="text-center text-red-500">ไม่สามารถสร้างสรุปได้</p>';
+                    }
+                } finally {
+                    ui.showLoader(false);
+                }
             }
-        }
+        };
 
         // =================================================================
-        // 9. UTILITY FUNCTIONS
+        // 8. SEARCH MODULE (search.js)
         // =================================================================
-        function formatDate(date) { return date.toISOString().split('T')[0]; }
-        
-        function translateDay(day) {
-            const map = { Monday: "วันจันทร์", Tuesday: "วันอังคาร", Wednesday: "วันพุธ", Thursday: "วันพฤหัสบดี", Friday: "วันศุกร์", Saturday: "วันเสาร์", Sunday: "วันอาทิตย์"};
-            return map[day] || day;
-        }
+        const search = {
+            performSearch: function(query) {
+                const upcomingList = appDom.upcomingEventsList;
+                const mobileResults = appDom.mobileSearchResults;
+                if (!query || query.length < 2) {
+                    events.renderUpcoming();
+                    if(mobileResults) mobileResults.innerHTML = '';
+                    return;
+                }
+                const results = appState.events
+                    .filter(e => e.title.toLowerCase().includes(query.toLowerCase()) || e.category.toLowerCase().includes(query.toLowerCase()))
+                    .sort((a,b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
+                
+                if(upcomingList) upcomingList.innerHTML = '';
+                if(mobileResults) mobileResults.innerHTML = '';
+
+                if (results.length > 0) {
+                    results.forEach(event => {
+                         const item = events.createEventListItem(event, true);
+                         if(upcomingList) upcomingList.appendChild(item.cloneNode(true));
+                         if(mobileResults) mobileResults.appendChild(item);
+                    });
+                } else {
+                    const noResult = '<p class="text-slate-500 text-center p-4">ไม่พบผลการค้นหา</p>';
+                    if(upcomingList) upcomingList.innerHTML = noResult;
+                    if(mobileResults) mobileResults.innerHTML = noResult;
+                }
+            }
+        };
 
         // =================================================================
-        // 10. APP INITIALIZATION
+        // 9. ACCOUNT MODULE (account.js)
+        // =================================================================
+        const account = {
+            confirmDelete: async function() {
+                 try {
+                    const response = await api.callAppScript({ action: 'deleteUserAccount' });
+                    if (response.status === 'success') {
+                        ui.toggleModal('delete-confirm-modal', false);
+                        auth.logout(false);
+                        setTimeout(() => ui.showStatusBox('บัญชีของคุณถูกลบเรียบร้อยแล้ว'), 500);
+                    } else {
+                        ui.showStatusBox(response.message || 'ลบบัญชีไม่สำเร็จ', 'error');
+                    }
+                } catch (error) {
+                    ui.showStatusBox('เกิดข้อผิดพลาดในการลบบัญชี', 'error');
+                }
+            }
+        };
+
+        // =================================================================
+        // 10. UTILS MODULE (utils.js)
+        // =================================================================
+        const utils = {
+            formatDate: function(date) { return date.toISOString().split('T')[0]; },
+            translateDay: function(day) {
+                const map = { Monday: "วันจันทร์", Tuesday: "วันอังคาร", Wednesday: "วันพุธ", Thursday: "วันพฤหัสบดี", Friday: "วันศุกร์", Saturday: "วันเสาร์", Sunday: "วันอาทิตย์"};
+                return map[day] || day;
+            }
+        };
+
+        // =================================================================
+        // 11. APP INITIALIZATION (app.js)
         // =================================================================
         function setupEventListeners() {
             document.body.addEventListener('click', e => {
@@ -758,44 +775,44 @@
                 const action = target.dataset.action;
                 const eventId = target.dataset.eventId;
                 const handlers = {
-                    prevMonth: () => changeMonth(-1),
-                    nextMonth: () => changeMonth(1),
-                    logout: () => logout(),
-                    backToEmail: () => showLoginStep('email'),
-                    openGoalModal: () => toggleModal('goal-modal', true),
-                    openSummaryModal: () => openSummaryModal(),
-                    openSearchModal: () => toggleModal('search-modal', true),
-                    openDeleteConfirm: () => toggleModal('delete-confirm-modal', true),
-                    confirmDelete: () => confirmDelete(),
-                    addGoalsToCalendar: () => addGoalsToCalendar(),
+                    prevMonth: () => calendar.changeMonth(-1),
+                    nextMonth: () => calendar.changeMonth(1),
+                    logout: () => auth.logout(),
+                    backToEmail: () => ui.showLoginStep('email'),
+                    openGoalModal: () => ui.toggleModal('goal-modal', true),
+                    openSummaryModal: () => features.openSummaryModal(),
+                    openSearchModal: () => ui.toggleModal('search-modal', true),
+                    openDeleteConfirm: () => ui.toggleModal('delete-confirm-modal', true),
+                    confirmDelete: () => account.confirmDelete(),
+                    addGoalsToCalendar: () => features.addGoalsToCalendar(),
                     addNewEventFromList: () => {
-                        toggleModal('daily-events-modal', false);
-                        openEventModal();
+                        ui.toggleModal('daily-events-modal', false);
+                        events.openEventModal();
                     },
-                    closeModal: () => toggleModal(target.dataset.target, false),
+                    closeModal: () => ui.toggleModal(target.dataset.target, false),
                     editEvent: () => {
                         const eventToEdit = appState.events.find(e => e.id === eventId);
-                        if (eventToEdit) openEventModal(eventToEdit);
+                        if (eventToEdit) events.openEventModal(eventToEdit);
                     },
-                    deleteEvent: () => deleteEvent(eventId)
+                    deleteEvent: () => events.deleteEvent(eventId)
                 };
                 if (handlers[action]) handlers[action]();
             });
 
             const handleDayClick = e => {
                 const cell = e.target.closest('.day-cell[data-date]');
-                if (cell) openDailyModal(cell.dataset.date);
+                if (cell) events.openDailyModal(cell.dataset.date);
             };
             if(appDom.calendarBody) appDom.calendarBody.addEventListener('click', handleDayClick);
             if(appDom.calendarBodyMobile) appDom.calendarBodyMobile.addEventListener('click', handleDayClick);
 
-            if(appDom.emailForm) appDom.emailForm.addEventListener('submit', handleEmailSubmit);
-            if(appDom.otpForm) appDom.otpForm.addEventListener('submit', handleOtpSubmit);
-            if(appDom.eventForm) appDom.eventForm.addEventListener('submit', saveEvent);
-            if(appDom.goalForm) appDom.goalForm.addEventListener('submit', handleGoalSubmit);
+            if(appDom.emailForm) appDom.emailForm.addEventListener('submit', auth.handleEmailSubmit);
+            if(appDom.otpForm) appDom.otpForm.addEventListener('submit', auth.handleOtpSubmit);
+            if(appDom.eventForm) appDom.eventForm.addEventListener('submit', events.saveEvent);
+            if(appDom.goalForm) appDom.goalForm.addEventListener('submit', features.handleGoalSubmit);
             
-            if(appDom.searchInput) appDom.searchInput.addEventListener('input', e => performSearch(e.target.value));
-            if(appDom.mobileSearchInput) appDom.mobileSearchInput.addEventListener('input', e => performSearch(e.target.value));
+            if(appDom.searchInput) appDom.searchInput.addEventListener('input', e => search.performSearch(e.target.value));
+            if(appDom.mobileSearchInput) appDom.mobileSearchInput.addEventListener('input', e => search.performSearch(e.target.value));
         }
 
         function startApp() {
@@ -803,9 +820,9 @@
             if(appDom.appContainer) appDom.appContainer.classList.remove('hidden');
             if(appDom.displayEmailSidebar) appDom.displayEmailSidebar.textContent = appState.userEmail;
             if(appDom.displayEmailMobile) appDom.displayEmailMobile.textContent = appState.userEmail;
-            fetchEvents();
+            events.fetchEvents();
             if (appState.autoRefreshInterval) clearInterval(appState.autoRefreshInterval);
-            appState.autoRefreshInterval = setInterval(() => fetchEvents(false), 60000);
+            appState.autoRefreshInterval = setInterval(() => events.fetchEvents(false), 60000);
         }
 
         function init() {
@@ -823,10 +840,11 @@
                 appDom[id.replace(/-(\w)/g, (_, p1) => p1.toUpperCase())] = document.getElementById(id);
             });
             setupEventListeners();
-            initializeApp();
+            auth.initializeApp();
         }
 
-        document.addEventListener('DOMContentLoaded', init);
+        // Call init() directly after the entire DOM has been parsed.
+        init();
     </script>
 
 </body>
