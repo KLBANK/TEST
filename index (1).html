@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แอปปฏิทินอัจฉริยะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+        .day-cell {
+            transition: all 0.2s ease-in-out;
+        }
+        .day-cell:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+            z-index: 10;
+        }
+        .event-dot { width: 8px; height: 8px; border-radius: 50%; background-color: #fb923c; }
+        .event-list::-webkit-scrollbar { width: 6px; }
+        .event-list::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .event-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .modal-content {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .gemini-suggestion-content p { margin-bottom: 0.75rem; }
+        .gemini-suggestion-content h3 { font-weight: 600; margin-bottom: 0.25rem; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Login / OTP Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-100 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center modal-content">
+            <div id="email-step">
+                <div class="mx-auto mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-orange-100">
+                    <svg class="h-8 w-8 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                </div>
+                <h3 class="text-2xl font-bold mb-2 text-slate-800">เข้าสู่ระบบ / ลงทะเบียน</h3>
+                <p class="text-slate-500 mb-6">กรุณาใส่อีเมลของคุณเพื่อรับรหัส OTP</p>
+                <form id="email-form">
+                    <div class="mb-4"><input type="email" id="user-email-input" placeholder="example@gmail.com" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-orange-500" required></div>
+                    <button type="submit" class="w-full px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">ขอรหัส OTP</button>
+                </form>
+            </div>
+            <div id="otp-step" class="hidden">
+                <h3 class="text-2xl font-bold mb-2 text-slate-800">ยืนยันตัวตน</h3>
+                <p class="text-slate-500 mb-6">กรอกรหัส 6 หลักที่ส่งไปยัง <br><strong id="otp-email-display" class="font-medium"></strong></p>
+                <form id="otp-form">
+                    <div class="mb-4"><input type="text" id="otp-input" inputmode="numeric" maxlength="6" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-center text-2xl tracking-[.5em] focus:ring-2 focus:ring-orange-500" required></div>
+                    <button type="submit" class="w-full px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">ยืนยันรหัส</button>
+                </form>
+                <button id="back-to-email-btn" class="mt-4 text-sm text-slate-500 hover:underline">กลับไปแก้ไขอีเมล</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl hidden">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 px-2 gap-4">
+            <div>
+                <p class="text-sm text-slate-600">อีเมลสำหรับรับการแจ้งเตือน: <strong id="display-email" class="font-medium text-orange-600"></strong></p>
+                <div class="flex items-center space-x-4">
+                    <button id="logout-btn" class="text-sm text-orange-500 hover:underline font-medium">ออกจากระบบ</button>
+                    <button id="delete-account-btn" class="text-sm text-red-500 hover:underline font-medium">ลบบัญชี</button>
+                </div>
+            </div>
+            <button id="weekly-goal-btn" class="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-teal-400 to-cyan-500 text-white rounded-lg shadow-md hover:from-teal-500 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center space-x-2">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.0006 18.26L4.94715 22.2082L6.52248 14.2799L0.587891 8.7918L8.61483 7.84006L12.0006 0.5L15.3864 7.84006L23.4133 8.7918L17.4787 14.2799L19.054 22.2082L12.0006 18.26Z"></path></svg>
+                <span>ตั้งเป้าหมายสัปดาห์นี้</span>
+            </button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <div class="flex items-center justify-between mb-6">
+                <button id="prev-month" class="p-2 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+                <h2 id="month-year" class="text-2xl font-bold text-center text-slate-700"></h2>
+                <button id="next-month" class="p-2 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
+            </div>
+            <div class="grid calendar-grid gap-1 text-center font-medium text-slate-500 mb-2"><div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div></div>
+            <div id="calendar-body" class="grid calendar-grid gap-2"></div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="daily-events-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all modal-content" id="daily-events-modal-content">
+            <div class="flex justify-between items-center mb-4"><h3 id="daily-events-title" class="text-xl font-bold text-slate-800"></h3><button id="close-daily-events" class="p-2 rounded-full hover:bg-slate-200">&times;</button></div>
+            <div id="daily-events-list" class="event-list max-h-64 overflow-y-auto space-y-3 pr-2"></div>
+            <button id="add-new-event-from-list" class="mt-6 w-full px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all shadow-md">เพิ่มการแจ้งเตือนสำหรับวันนี้</button>
+        </div>
+    </div>
+
+    <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md transform transition-all modal-content" id="event-modal-content">
+            <h3 id="event-modal-title" class="text-2xl font-bold mb-6 text-slate-800">สร้างการแจ้งเตือนใหม่</h3>
+            <form id="event-form">
+                <div class="mb-4"><label for="event-title" class="block text-sm font-medium text-slate-600 mb-1">หัวข้อ</label><input type="text" id="event-title" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></div>
+                <div class="mb-4"><label for="event-date" class="block text-sm font-medium text-slate-600 mb-1">วันที่</label><input type="date" id="event-date" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></div>
+                <div class="mb-4"><label for="event-time" class="block text-sm font-medium text-slate-600 mb-1">เวลา</label><input type="time" id="event-time" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></div>
+                <div class="mb-6">
+                    <label for="reminder-offset" class="block text-sm font-medium text-slate-600 mb-1">เตือนฉันล่วงหน้า</label>
+                    <select id="reminder-offset" class="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white">
+                        <option value="0">ตรงเวลา</option>
+                        <option value="5">5 นาทีก่อน</option>
+                        <option value="15">15 นาทีก่อน</option>
+                        <option value="60">1 ชั่วโมงก่อน</option>
+                        <option value="1440">1 วันก่อน</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-4"><button type="button" id="cancel-event" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300">ยกเลิก</button><button type="submit" class="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 shadow-md">บันทึก</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="goal-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-lg transform transition-all modal-content" id="goal-modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold text-slate-800">✨ ผู้ช่วยตั้งเป้าหมายประจำสัปดาห์</h3>
+                <button id="close-goal-modal" class="p-2 rounded-full hover:bg-slate-200">&times;</button>
+            </div>
+            <p class="text-slate-500 mb-6">บอกเป้าหมายของคุณสั้นๆ แล้ว AI จะช่วยสร้างแผนการแจ้งเตือนให้คุณ</p>
+            <div id="goal-input-section">
+                <form id="goal-form" class="flex items-center space-x-2">
+                    <input type="text" id="goal-idea" placeholder="เช่น ออกกำลังกาย, อ่านหนังสือ, เรียนรู้เรื่องใหม่..." class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500">
+                    <button type="submit" class="px-5 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors whitespace-nowrap shadow-md">สร้างแผน</button>
+                </form>
+            </div>
+            <div id="goal-result-section" class="hidden mt-6">
+                <h4 class="font-semibold text-lg mb-3 text-left">แผนการแจ้งเตือนที่แนะนำ:</h4>
+                <div id="goal-suggestions" class="max-h-60 overflow-y-auto space-y-2 text-left pr-2"></div>
+                <button id="add-goals-to-calendar-btn" class="mt-6 w-full px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-md">เพิ่มทั้งหมดลงในปฏิทิน</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md transform transition-all modal-content" id="delete-confirm-modal-content">
+            <div class="text-center">
+                <div class="mx-auto mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-red-100">
+                    <svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800">ยืนยันการลบบัญชี</h3>
+                <p class="text-slate-500 my-4">คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีและข้อมูลทั้งหมดของคุณ? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="cancel-delete-btn" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300">ยกเลิก</button>
+                    <button id="confirm-delete-btn" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md">ยืนยันการลบ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Status Message Box -->
+    <div id="status-box" class="fixed bottom-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all">
+        <p id="status-text"></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let currentDate = new Date();
+            let userEmail = null;
+            let events = [];
+            let currentSelectedDate = null;
+            let autoRefreshInterval = null;
+            const appScriptUrl = 'https://script.google.com/macros/s/AKfycbx86xRIo538sdGqQbh4Xj3JtBs0C3Co4N4uoVOAWEtWFxzkbhmOGj8WHVPMAF-ecaO5/exec';
+
+            const dom = {
+                loginModal: document.getElementById('login-modal'),
+                appContainer: document.getElementById('app-container'),
+                emailStep: document.getElementById('email-step'),
+                otpStep: document.getElementById('otp-step'),
+                emailForm: document.getElementById('email-form'),
+                otpForm: document.getElementById('otp-form'),
+                emailInput: document.getElementById('user-email-input'),
+                otpInput: document.getElementById('otp-input'),
+                otpEmailDisplay: document.getElementById('otp-email-display'),
+                backToEmailBtn: document.getElementById('back-to-email-btn'),
+                displayEmailEl: document.getElementById('display-email'),
+                logoutBtn: document.getElementById('logout-btn'),
+                deleteAccountBtn: document.getElementById('delete-account-btn'),
+                deleteConfirmModal: document.getElementById('delete-confirm-modal'),
+                cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
+                confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
+                monthYearEl: document.getElementById('month-year'),
+                calendarBody: document.getElementById('calendar-body'),
+                eventModal: document.getElementById('event-modal'),
+                eventForm: document.getElementById('event-form'),
+                dailyEventsModal: document.getElementById('daily-events-modal'),
+                dailyEventsList: document.getElementById('daily-events-list'),
+                weeklyGoalBtn: document.getElementById('weekly-goal-btn'),
+                goalModal: document.getElementById('goal-modal'),
+                closeGoalModalBtn: document.getElementById('close-goal-modal'),
+                goalForm: document.getElementById('goal-form'),
+                goalIdeaInput: document.getElementById('goal-idea'),
+                goalResultSection: document.getElementById('goal-result-section'),
+                goalSuggestions: document.getElementById('goal-suggestions'),
+                addGoalsToCalendarBtn: document.getElementById('add-goals-to-calendar-btn'),
+            };
+
+            const thaiMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+            const dayMap = { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 0 };
+
+            const showStep = (step) => {
+                dom.emailStep.classList.toggle('hidden', step !== 'email');
+                dom.otpStep.classList.toggle('hidden', step !== 'otp');
+            };
+            
+            async function callGemini(prompt, useJson = false) {
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                if (useJson) {
+                    payload.generationConfig = {
+                        responseMimeType: "application/json",
+                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { day: { type: "STRING" }, time: { type: "STRING" }, title: { type: "STRING" } }, required: ["day", "time", "title"] } }
+                    };
+                }
+                try {
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
+                } catch (error) {
+                    console.error("Gemini API call error:", error);
+                    return null;
+                }
+            }
+            
+            const initializeApp = async () => {
+                const storedEmail = localStorage.getItem('calendarUserEmail');
+                const storedToken = localStorage.getItem('calendarSessionToken');
+                if (storedEmail && storedToken) {
+                    try {
+                        const response = await fetch(appScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'verifySession', email: storedEmail, sessionToken: storedToken }) }).then(res => res.json());
+                        if (response.status === 'success') {
+                            userEmail = storedEmail;
+                            startApp();
+                            return;
+                        }
+                    } catch (error) { console.error("Session verification failed:", error); }
+                }
+                logout();
+            };
+
+            const startApp = () => {
+                dom.displayEmailEl.textContent = userEmail;
+                dom.loginModal.classList.add('hidden');
+                dom.appContainer.classList.remove('hidden');
+                loadReminders();
+                if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+                autoRefreshInterval = setInterval(() => loadReminders(true), 60000);
+            };
+            
+            const logout = () => {
+                localStorage.removeItem('calendarUserEmail');
+                localStorage.removeItem('calendarSessionToken');
+                userEmail = null;
+                showStep('email');
+                dom.loginModal.classList.remove('hidden');
+                dom.appContainer.classList.add('hidden');
+                if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+            };
+
+            const loadReminders = async (isRefresh = false) => {
+                if (!userEmail) return;
+                try {
+                    const response = await fetch(appScriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'getReminders', email: userEmail }) });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        events = result.data;
+                    } else { throw new Error(result.message); }
+                } catch (error) {
+                    console.error("Failed to load reminders:", error);
+                    if (!isRefresh) showStatusBox('ไม่สามารถโหลดข้อมูลได้', 'error');
+                    events = [];
+                } finally {
+                    renderCalendar();
+                }
+            };
+
+            dom.emailForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = dom.emailInput.value;
+                const submitButton = dom.emailForm.querySelector('button[type="submit"]');
+                const originalText = submitButton.textContent;
+                submitButton.textContent = 'กำลังส่ง...';
+                submitButton.disabled = true;
+                try {
+                    const response = await fetch(appScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'requestOTP', email: email }) }).then(res => res.json());
+                    if (response.status === 'success') {
+                        dom.otpEmailDisplay.textContent = email;
+                        showStep('otp');
+                    } else { throw new Error(response.message); }
+                } catch (error) {
+                    console.error('OTP Request failed:', error);
+                    showStatusBox('ไม่สามารถส่ง OTP ได้', 'error');
+                } finally {
+                    submitButton.textContent = originalText;
+                    submitButton.disabled = false;
+                }
+            });
+
+            dom.otpForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = dom.emailInput.value;
+                const otp = dom.otpInput.value;
+                const submitButton = dom.otpForm.querySelector('button[type="submit"]');
+                const originalText = submitButton.textContent;
+                submitButton.textContent = 'กำลังตรวจสอบ...';
+                submitButton.disabled = true;
+                try {
+                    const response = await fetch(appScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'verifyOTP', email: email, otp: otp }) }).then(res => res.json());
+                    if (response.status === 'success' && response.sessionToken) {
+                        localStorage.setItem('calendarUserEmail', email);
+                        localStorage.setItem('calendarSessionToken', response.sessionToken);
+                        userEmail = email;
+                        startApp();
+                    } else { throw new Error(response.message || 'Verification failed'); }
+                } catch (error) {
+                    console.error('OTP Verification failed:', error);
+                    showStatusBox(error.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ', 'error');
+                    dom.otpInput.value = '';
+                } finally {
+                    submitButton.textContent = originalText;
+                    submitButton.disabled = false;
+                }
+            });
+            
+            dom.backToEmailBtn.addEventListener('click', () => showStep('email'));
+            dom.logoutBtn.addEventListener('click', logout);
+
+            const renderCalendar = () => {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                dom.monthYearEl.textContent = `${thaiMonths[month]} ${year + 543}`;
+                dom.calendarBody.innerHTML = '';
+                const firstDayOfMonth = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                for (let i = 0; i < firstDayOfMonth; i++) dom.calendarBody.appendChild(document.createElement('div'));
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'day-cell relative p-2 h-24 rounded-lg cursor-pointer bg-white hover:bg-slate-50 border flex flex-col';
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dayNumber = document.createElement('span');
+                    dayNumber.textContent = day;
+                    dayNumber.className = 'self-start';
+                    const today = new Date();
+                    if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                        dayNumber.className += ' bg-orange-500 text-white rounded-full w-8 h-8 flex items-center justify-center';
+                    }
+                    dayCell.appendChild(dayNumber);
+                    const eventsOnDay = events.filter(e => e.date === dateStr);
+                    if (eventsOnDay.length > 0) {
+                        const dot = document.createElement('div');
+                        dot.className = 'event-dot mx-auto mt-auto mb-1';
+                        dayCell.appendChild(dot);
+                    }
+                    dayCell.addEventListener('click', () => handleDayClick(dateStr));
+                    dom.calendarBody.appendChild(dayCell);
+                }
+            };
+            
+            const handleDayClick = (dateStr) => {
+                currentSelectedDate = dateStr;
+                const eventsOnDay = events.filter(e => e.date === dateStr);
+                if (eventsOnDay.length > 0) {
+                    openDailyEventsModal(dateStr, eventsOnDay);
+                } else {
+                    openEventModal(dateStr);
+                }
+            };
+            
+            const openDailyEventsModal = (dateStr, eventsOnDay) => {
+                const dateObj = new Date(dateStr + 'T00:00:00');
+                document.getElementById('daily-events-title').textContent = `แจ้งเตือนวันที่ ${dateObj.getDate()}`;
+                dom.dailyEventsList.innerHTML = '';
+                eventsOnDay.sort((a, b) => a.time.localeCompare(b.time));
+                eventsOnDay.forEach(event => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-lg';
+                    let statusBadge = '';
+                    let deleteButton = `<button data-id="${event.id}" class="delete-event-btn p-2 text-red-500 hover:bg-red-100 rounded-full"><svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+                    if (event.status === 'SENT') {
+                        statusBadge = `<span class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">ส่งแล้ว</span>`;
+                        deleteButton = '';
+                    } else if (event.status === 'FAILED') {
+                        statusBadge = `<span class="text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded-full">ล้มเหลว</span>`;
+                    } else {
+                        statusBadge = `<span class="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded-full">รอส่ง</span>`;
+                    }
+                    item.innerHTML = `<div class="flex-1"><p class="font-semibold">${event.title}</p><p class="text-sm text-slate-500">${event.time} น.</p></div><div class="flex items-center space-x-2">${statusBadge}${deleteButton}</div>`;
+                    dom.dailyEventsList.appendChild(item);
+                });
+                toggleModal('daily-events-modal', true);
+            };
+
+            const openEventModal = (date) => {
+                dom.eventForm.reset();
+                document.getElementById('event-date').value = date;
+                toggleModal('event-modal', true);
+            };
+
+            const saveReminder = async (reminderData) => {
+                try {
+                    await fetch(appScriptUrl, { method: 'POST', body: JSON.stringify(reminderData), mode: 'no-cors' });
+                    return true;
+                } catch (error) {
+                    console.error('Save reminder failed:', error);
+                    return false;
+                }
+            };
+
+            dom.eventForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitButton = dom.eventForm.querySelector('button[type="submit"]');
+                const originalText = submitButton.textContent;
+                submitButton.textContent = 'กำลังบันทึก...';
+                submitButton.disabled = true;
+                const success = await saveReminder({ action: 'saveReminder', title: document.getElementById('event-title').value, date: document.getElementById('event-date').value, time: document.getElementById('event-time').value, email: userEmail, reminderOffset: document.getElementById('reminder-offset').value });
+                if (success) {
+                    showStatusBox('บันทึกการแจ้งเตือนสำเร็จแล้ว!', 'success');
+                    toggleModal('event-modal', false);
+                    setTimeout(loadReminders, 1000); 
+                } else {
+                    showStatusBox('เกิดข้อผิดพลาดในการบันทึก', 'error');
+                }
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+            });
+
+            const deleteReminder = async (eventId) => {
+                try {
+                    await fetch(appScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'deleteReminder', id: eventId }), mode: 'no-cors' });
+                    showStatusBox('ลบการแจ้งเตือนแล้ว', 'success');
+                    toggleModal('daily-events-modal', false);
+                    setTimeout(loadReminders, 1000);
+                } catch (error) {
+                    showStatusBox('เกิดข้อผิดพลาดในการลบ', 'error');
+                }
+            };
+
+            dom.weeklyGoalBtn.addEventListener('click', () => {
+                dom.goalResultSection.classList.add('hidden');
+                dom.goalIdeaInput.value = '';
+                toggleModal('goal-modal', true);
+            });
+
+            dom.goalForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const goal = dom.goalIdeaInput.value;
+                if (!goal.trim()) {
+                    showStatusBox('กรุณาใส่เป้าหมายก่อนค่ะ', 'error');
+                    return;
+                }
+                const submitButton = dom.goalForm.querySelector('button[type="submit"]');
+                const originalText = submitButton.textContent;
+                submitButton.textContent = 'กำลังคิด...';
+                submitButton.disabled = true;
+                dom.goalResultSection.classList.remove('hidden');
+                dom.goalSuggestions.innerHTML = '<p>AI กำลังสร้างแผนให้สักครู่...</p>';
+                const prompt = `Based on the goal "${goal}", create 3-4 specific, actionable, and encouraging calendar events for this week (Monday to Sunday) to help me achieve it. Provide the response as a JSON array of objects, each with a "day" (in English, e.g., "Monday"), "time" (e.g., "18:00"), and "title" (in Thai) property.`;
+                const resultText = await callGemini(prompt, true);
+                if (resultText) {
+                    try {
+                        const suggestions = JSON.parse(resultText);
+                        dom.goalSuggestions.innerHTML = '';
+                        suggestions.forEach(s => {
+                            const div = document.createElement('div');
+                            div.className = 'p-3 bg-slate-100 rounded-md';
+                            div.innerHTML = `<p class="font-semibold">${s.title}</p><p class="text-sm text-slate-500">${s.day}, ${s.time}</p>`;
+                            dom.goalSuggestions.appendChild(div);
+                        });
+                        dom.addGoalsToCalendarBtn.onclick = () => addGoalsToCalendar(suggestions);
+                    } catch (err) {
+                        dom.goalSuggestions.innerHTML = '<p class="text-red-500">ขออภัยค่ะ AI ไม่สามารถสร้างแผนได้ในขณะนี้</p>';
+                    }
+                } else {
+                    dom.goalSuggestions.innerHTML = '<p class="text-red-500">เกิดข้อผิดพลาดในการสื่อสารกับ AI</p>';
+                }
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+            });
+
+            const addGoalsToCalendar = async (suggestions) => {
+                const today = new Date();
+                const currentDay = today.getDay();
+                const button = dom.addGoalsToCalendarBtn;
+                button.textContent = 'กำลังเพิ่ม...';
+                button.disabled = true;
+                let successCount = 0;
+                for (const suggestion of suggestions) {
+                    const targetDay = dayMap[suggestion.day];
+                    if (targetDay === undefined) continue;
+                    const dateOffset = targetDay - currentDay;
+                    const targetDate = new Date(today);
+                    targetDate.setDate(today.getDate() + dateOffset);
+                    const success = await saveReminder({ action: 'saveReminder', title: suggestion.title, date: targetDate.toISOString().split('T')[0], time: suggestion.time, email: userEmail, reminderOffset: '15' }); // Default 15 min reminder
+                    if(success) successCount++;
+                }
+                showStatusBox(`เพิ่ม ${successCount} การแจ้งเตือนใหม่สำเร็จ!`, 'success');
+                toggleModal('goal-modal', false);
+                setTimeout(loadReminders, 1000);
+                button.textContent = 'เพิ่มทั้งหมดลงในปฏิทิน';
+                button.disabled = false;
+            };
+
+            const toggleModal = (modalId, show) => {
+                const modal = document.getElementById(modalId);
+                const content = modal.querySelector('[id$="-content"]');
+                if (show) {
+                    modal.classList.remove('hidden');
+                    setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 10);
+                } else {
+                    content.classList.add('scale-95', 'opacity-0');
+                    setTimeout(() => modal.classList.add('hidden'), 200);
+                }
+            };
+            
+            const showStatusBox = (message, type = 'success') => {
+                const statusBox = document.getElementById('status-box');
+                const statusText = document.getElementById('status-text');
+                statusText.textContent = message;
+                statusBox.className = `fixed bottom-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+                statusBox.classList.remove('translate-y-20', 'opacity-0');
+                setTimeout(() => {
+                    statusBox.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            };
+            
+            // Event Listeners
+            dom.deleteAccountBtn.addEventListener('click', () => toggleModal('delete-confirm-modal', true));
+            dom.cancelDeleteBtn.addEventListener('click', () => toggleModal('delete-confirm-modal', false));
+            dom.confirmDeleteBtn.addEventListener('click', async () => {
+                const button = dom.confirmDeleteBtn;
+                button.textContent = 'กำลังลบ...';
+                button.disabled = true;
+                try {
+                    await fetch(appScriptUrl, { method: 'POST', body: JSON.stringify({ action: 'deleteUserAccount', email: userEmail }), mode: 'no-cors' });
+                    showStatusBox('ลบบัญชีของคุณเรียบร้อยแล้ว', 'success');
+                    setTimeout(() => logout(), 1500);
+                } catch (error) {
+                    showStatusBox('เกิดข้อผิดพลาดในการลบบัญชี', 'error');
+                } finally {
+                    toggleModal('delete-confirm-modal', false);
+                    button.textContent = 'ยืนยันการลบ';
+                    button.disabled = false;
+                }
+            });
+
+            document.getElementById('prev-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); });
+            document.getElementById('next-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); });
+            document.getElementById('cancel-event').addEventListener('click', () => toggleModal('event-modal', false));
+            document.getElementById('close-daily-events').addEventListener('click', () => toggleModal('daily-events-modal', false));
+            document.getElementById('add-new-event-from-list').addEventListener('click', () => { toggleModal('daily-events-modal', false); openEventModal(currentSelectedDate); });
+            dom.dailyEventsList.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-event-btn');
+                if (deleteBtn) {
+                    deleteReminder(deleteBtn.dataset.id);
+                }
+            });
+            dom.closeGoalModalBtn.addEventListener('click', () => toggleModal('goal-modal', false));
+            
+            // Initial App Start
+            initializeApp();
+        });
+    </script>
+</body>
+</html>
