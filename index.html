@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แอปปฏิทินอัจฉริยะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- ดึงไฟล์ css.html เข้ามา -->
+    <?!= include('css'); ?>
+
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <!-- Global Loader -->
+    <div id="global-loader" class="fixed inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-[99] hidden">
+        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+    </div>
+
+    <!-- Login / OTP Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-100 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-sm text-center modal-content">
+            <div id="email-step">
+                <div class="mx-auto mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-indigo-100"><svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg></div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-2 text-slate-800">เข้าสู่ระบบ / ลงทะเบียน</h3>
+                <p class="text-slate-500 mb-6 text-sm sm:text-base">กรุณาใส่อีเมลของคุณเพื่อรับรหัส OTP</p>
+                <form id="email-form">
+                    <div class="mb-4"><input type="email" id="user-email-input" placeholder="example@gmail.com" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-indigo-500" required></div>
+                    <button type="submit" class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">ขอรหัส OTP</button>
+                </form>
+            </div>
+            <div id="otp-step" class="hidden">
+                <h3 class="text-xl sm:text-2xl font-bold mb-2 text-slate-800">ยืนยันตัวตน</h3>
+                <p class="text-slate-500 mb-6 text-sm sm:text-base">กรอกรหัส 6 หลักที่ส่งไปยัง <br><strong id="otp-email-display" class="font-medium"></strong></p>
+                <form id="otp-form">
+                    <div class="mb-4"><input type="text" id="otp-input" inputmode="numeric" maxlength="6" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-center text-xl sm:text-2xl tracking-[.5em] focus:ring-2 focus:ring-indigo-500" required></div>
+                    <button type="submit" class="w-full px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">ยืนยันรหัส</button>
+                </form>
+                <button data-action="backToEmail" class="mt-4 text-sm text-slate-500 hover:underline">กลับไปแก้ไขอีเมล</button>
+            </div>
+             <p class="text-center text-xs text-slate-400 mt-6">เว็บแอปพลิเคชันนี้ถูกสร้างขึ้นเพื่อเป็นส่วนหนึ่งของโครงงานนักเรียน หากมีข้อผิดพลาดประการใด ทางผู้จัดทำต้องขออภัยมา ณ ที่นี้ด้วยครับ</p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="min-h-screen hidden">
+        <!-- Desktop Layout -->
+        <div class="lg:flex h-screen hidden">
+            <!-- Sidebar (for large screens) -->
+            <aside class="w-1/3 xl:w-1/4 bg-white p-6 border-r border-slate-200 flex flex-col">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6">ภาพรวม</h2>
+                <div class="relative mb-6">
+                    <input type="text" id="search-input" data-action="search" placeholder="ค้นหาการแจ้งเตือน..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                </div>
+                <h3 class="font-semibold text-slate-600 mb-3">การแจ้งเตือนที่กำลังจะมาถึง</h3>
+                <div id="upcoming-events-list" class="flex-1 overflow-y-auto space-y-3"></div>
+                <div class="mt-6 space-y-2">
+                    <button data-action="openSummaryModal" class="w-full px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg shadow-md hover:from-violet-600 hover:to-fuchsia-600 transition-all duration-300 flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm4.284 14.284L15 15l-1.284 1.284L12 15l-1.284 1.284L9.432 15l-1.284 1.284-1.432-1.432 1.284-1.284L6.716 12l1.284-1.284L6.568 9.432l1.432-1.432 1.284 1.284L10.716 8l1.284-1.284L13.284 8l1.284-1.284 1.432 1.432-1.284 1.284L17.284 12l-1.284 1.284 1.432 1.432-1.148 1.148z"></path></svg>
+                        <span>สรุปสัปดาห์นี้</span>
+                    </button>
+                     <button data-action="openGoalModal" class="w-full px-5 py-2.5 bg-gradient-to-r from-teal-400 to-cyan-500 text-white rounded-lg shadow-md hover:from-teal-500 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.0006 18.26L4.94715 22.2082L6.52248 14.2799L0.587891 8.7918L8.61483 7.84006L12.0006 0.5L15.3864 7.84006L23.4133 8.7918L17.4787 14.2799L19.054 22.2082L12.0006 18.26Z"></path></svg>
+                        <span>ตั้งเป้าหมายสัปดาห์นี้</span>
+                    </button>
+                </div>
+                <div class="mt-6 text-center">
+                     <p class="text-xs text-slate-500">อีเมล: <strong id="display-email-sidebar" class="font-medium text-indigo-600"></strong></p>
+                     <div class="flex items-center justify-center space-x-4">
+                        <button data-action="logout" class="text-xs text-indigo-500 hover:underline font-medium">ออกจากระบบ</button>
+                        <button data-action="openDeleteConfirm" class="text-xs text-red-500 hover:underline font-medium">ลบบัญชี</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content (Calendar) -->
+            <main class="w-full lg:w-2/3 xl:w-3/4 p-6 flex flex-col bg-slate-50">
+                 <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6 h-full flex flex-col">
+                    <div class="flex items-center justify-between mb-6">
+                        <button data-action="prevMonth" class="p-2 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+                        <h2 id="month-year" class="text-xl sm:text-2xl font-bold text-center text-slate-700"></h2>
+                        <button data-action="nextMonth" class="p-2 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
+                    </div>
+                    <div class="grid calendar-grid gap-1 text-center font-medium text-slate-500 mb-2 text-xs sm:text-sm"><div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div></div>
+                    <div id="calendar-body" class="grid calendar-grid gap-1 sm:gap-2 flex-1"></div>
+                </div>
+            </main>
+        </div>
+        
+        <!-- Mobile Layout -->
+        <div class="lg:hidden flex flex-col h-screen">
+            <header id="mobile-header" class="p-4 bg-white shadow-md">
+                <p class="text-sm text-slate-600 text-center">อีเมล: <strong id="display-email-mobile" class="font-medium text-indigo-600"></strong></p>
+            </header>
+            <main id="mobile-calendar-view" class="p-4 flex-1 bg-slate-50">
+                 <div class="bg-white rounded-2xl shadow-lg p-4 h-full flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <button data-action="prevMonth" class="p-2 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+                        <h2 id="month-year-mobile" class="text-lg font-bold text-center text-slate-700"></h2>
+                        <button data-action="nextMonth" class="p-2 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
+                    </div>
+                    <div class="grid calendar-grid gap-1 text-center font-medium text-slate-500 mb-2 text-xs"><div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div></div>
+                    <div id="calendar-body-mobile" class="grid calendar-grid gap-1 flex-1"></div>
+                </div>
+            </main>
+            <nav id="mobile-nav" class="bg-white shadow-t-lg p-2 flex justify-around">
+                <button data-action="openSearchModal" class="flex flex-col items-center text-slate-500 hover:text-indigo-600 p-2"><svg class="w-6 h-6 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg><span class="text-xs mt-1 pointer-events-none">ค้นหา</span></button>
+                <button data-action="openSummaryModal" class="flex flex-col items-center text-slate-500 hover:text-violet-500 p-2"><svg class="w-6 h-6 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm4.284 14.284L15 15l-1.284 1.284L12 15l-1.284 1.284L9.432 15l-1.284 1.284-1.432-1.432 1.284-1.284L6.716 12l1.284-1.284L6.568 9.432l1.432-1.432 1.284 1.284L10.716 8l1.284-1.284L13.284 8l1.284-1.284 1.432 1.432-1.284 1.284L17.284 12l-1.284 1.284 1.432 1.432-1.148 1.148z"></path></svg><span class="text-xs mt-1 pointer-events-none">สรุป</span></button>
+                <button data-action="openGoalModal" class="flex flex-col items-center text-slate-500 hover:text-teal-500 p-2"><svg class="w-6 h-6 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.0006 18.26L4.94715 22.2082L6.52248 14.2799L0.587891 8.7918L8.61483 7.84006L12.0006 0.5L15.3864 7.84006L23.4133 8.7918L17.4787 14.2799L19.054 22.2082L12.0006 18.26Z"></path></svg><span class="text-xs mt-1 pointer-events-none">เป้าหมาย</span></button>
+                <button data-action="openDeleteConfirm" class="flex flex-col items-center text-slate-500 hover:text-red-500 p-2"><svg class="w-6 h-6 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.134H8.09c-1.18 0-2.09.954-2.09 2.134v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg><span class="text-xs mt-1 pointer-events-none">ลบบัญชี</span></button>
+                <button data-action="logout" class="flex flex-col items-center text-slate-500 hover:text-indigo-600 p-2"><svg class="w-6 h-6 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg><span class="text-xs mt-1 pointer-events-none">ออก</span></button>
+            </nav>
+        </div>
+    </div>
+    
+    <!-- Modals (used by both layouts) -->
+    <div id="daily-events-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all modal-content" id="daily-events-modal-content">
+            <div class="flex justify-between items-center mb-4"><h3 id="daily-events-title" class="text-lg sm:text-xl font-bold text-slate-800"></h3><button data-action="closeModal" data-target="daily-events-modal" class="p-2 rounded-full hover:bg-slate-200">&times;</button></div>
+            <div id="daily-events-list" class="event-list max-h-64 overflow-y-auto space-y-3 pr-2"></div>
+            <button data-action="addNewEventFromList" class="mt-6 w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-md">เพิ่มการแจ้งเตือนสำหรับวันนี้</button>
+        </div>
+    </div>
+
+    <div id="event-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md transform transition-all modal-content" id="event-modal-content">
+            <h3 id="event-modal-title" class="text-xl sm:text-2xl font-bold mb-6 text-slate-800">สร้างการแจ้งเตือนใหม่</h3>
+            <form id="event-form">
+                <input type="hidden" id="event-id">
+                <div class="mb-4"><label for="event-title" class="block text-sm font-medium text-slate-600 mb-1">หัวข้อ</label><input type="text" id="event-title" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></div>
+                <div class="mb-4">
+                    <label for="event-category" class="block text-sm font-medium text-slate-600 mb-1">หมวดหมู่</label>
+                    <select id="event-category" class="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white">
+                        <option value="ทั่วไป">ทั่วไป</option>
+                        <option value="งาน">งาน</option>
+                        <option value="ส่วนตัว">ส่วนตัว</option>
+                        <option value="สุขภาพ">สุขภาพ</option>
+                        <option value="การเงิน">การเงิน</option>
+                        <option value="เป้าหมาย">เป้าหมาย</option>
+                    </select>
+                </div>
+                <div class="mb-4"><label for="event-date" class="block text-sm font-medium text-slate-600 mb-1">วันที่</label><input type="date" id="event-date" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></div>
+                <div class="mb-4"><label for="event-time" class="block text-sm font-medium text-slate-600 mb-1">เวลา</label><input type="time" id="event-time" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></div>
+                <div class="mb-6">
+                    <label for="reminder-offset" class="block text-sm font-medium text-slate-600 mb-1">เตือนฉันล่วงหน้า</label>
+                    <select id="reminder-offset" class="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white">
+                        <option value="0">ตรงเวลา</option>
+                        <option value="5">5 นาทีก่อน</option>
+                        <option value="15">15 นาทีก่อน</option>
+                        <option value="60">1 ชั่วโมงก่อน</option>
+                        <option value="1440">1 วันก่อน</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-4"><button type="button" data-action="closeModal" data-target="event-modal" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300">ยกเลิก</button><button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md">บันทึก</button></div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="search-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md transform transition-all modal-content" id="search-modal-content">
+             <div class="relative mb-4">
+                <input type="text" id="mobile-search-input" data-action="mobileSearch" placeholder="ค้นหาการแจ้งเตือน..." class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+            </div>
+            <div id="mobile-search-results" class="max-h-64 overflow-y-auto space-y-2"></div>
+             <button data-action="closeModal" data-target="search-modal" class="mt-4 w-full px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300">ปิด</button>
+        </div>
+    </div>
+    
+    <div id="goal-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-lg transform transition-all modal-content" id="goal-modal-content">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-xl sm:text-2xl font-bold text-slate-800">✨ ผู้ช่วยตั้งเป้าหมายประจำสัปดาห์</h3><button data-action="closeModal" data-target="goal-modal" class="p-2 rounded-full hover:bg-slate-200">&times;</button></div>
+            <p class="text-slate-500 mb-6">บอกเป้าหมายของคุณสั้นๆ แล้ว AI จะช่วยสร้างแผนการแจ้งเตือนให้คุณ</p>
+            <div id="goal-input-section">
+                <form id="goal-form" class="flex items-center space-x-2">
+                    <input type="text" id="goal-idea" placeholder="เช่น ออกกำลังกาย, อ่านหนังสือ..." class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500">
+                    <button type="submit" class="px-5 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors whitespace-nowrap shadow-md">สร้างแผน</button>
+                </form>
+            </div>
+            <div id="goal-result-section" class="hidden mt-6">
+                <h4 class="font-semibold text-lg mb-3 text-left">แผนการแจ้งเตือนที่แนะนำ:</h4>
+                <div id="goal-suggestions" class="max-h-60 overflow-y-auto space-y-2 text-left pr-2"></div>
+                <button data-action="addGoalsToCalendar" id="add-goals-to-calendar-btn" class="mt-6 w-full px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-md">เพิ่มทั้งหมดลงในปฏิทิน</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-lg transform transition-all modal-content" id="summary-modal-content">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-xl sm:text-2xl font-bold text-slate-800">🧠 สรุปภาพรวมสัปดาห์นี้</h3><button data-action="closeModal" data-target="summary-modal" class="p-2 rounded-full hover:bg-slate-200">&times;</button></div>
+            <div id="summary-content" class="gemini-content max-h-80 overflow-y-auto pr-2 text-slate-700"></div>
+        </div>
+    </div>
+
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md transform transition-all modal-content" id="delete-confirm-modal-content">
+            <div class="text-center">
+                <div class="mx-auto mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-red-100"><svg class="h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg></div>
+                <h3 class="text-xl font-bold text-slate-800">ยืนยันการลบบัญชี</h3>
+                <p class="text-slate-500 my-4">คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีและข้อมูลทั้งหมดของคุณ? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+                <div class="flex justify-center space-x-4">
+                    <button data-action="closeModal" data-target="delete-confirm-modal" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300">ยกเลิก</button>
+                    <button data-action="confirmDelete" id="confirm-delete-btn" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md">ยืนยันการลบ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="status-box" class="fixed bottom-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all z-[100]">
+        <p id="status-text"></p>
+    </div>
+
+    <script>
+        // =================================================================
+        // 1. STATE & CONFIGURATION
+        // =================================================================
+        const appState = {
+            currentDate: new Date(),
+            userEmail: null,
+            events: [],
+            currentSelectedDate: null,
+            autoRefreshInterval: null,
+            goalSuggestionsCache: [],
+        };
+
+        const appConfig = {
+            appScriptUrl: 'YOUR_BACKEND_URL_HERE', // ❗❗❗ สำคัญ: กรุณาใส่ URL ของ Back-end Apps Script ของคุณที่นี่
+            thaiMonths: ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"],
+            dayMap: { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 0 },
+            categoryColors: {
+                'งาน': 'bg-blue-500', 'ส่วนตัว': 'bg-purple-500', 'สุขภาพ': 'bg-emerald-500',
+                'การเงิน': 'bg-amber-500', 'เป้าหมาย': 'bg-cyan-500', 'ทั่วไป': 'bg-slate-400'
+            }
+        };
+
+        const appDom = {};
+
+        // =================================================================
+        // 2. UI FUNCTIONS
+        // =================================================================
+        function showLoader(show) {
+            if (appDom.globalLoader) appDom.globalLoader.classList.toggle('hidden', !show);
+        }
+
+        function showLoginStep(step) {
+            if (appDom.emailStep) appDom.emailStep.classList.toggle('hidden', step !== 'email');
+            if (appDom.otpStep) appDom.otpStep.classList.toggle('hidden', step !== 'otp');
+        }
+
+        function toggleModal(modalId, show) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.toggle('hidden', !show);
+        }
+        
+        function showStatusBox(message, type = 'success') {
+            if (!appDom.statusBox || !appDom.statusText) return;
+            appDom.statusText.textContent = message;
+            appDom.statusBox.className = `fixed bottom-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-all z-[100] ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+            appDom.statusBox.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => appDom.statusBox.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        // =================================================================
+        // 3. API FUNCTIONS
+        // =================================================================
+        async function callGemini(prompt, useJson = false) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            if (useJson) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { day: { type: "STRING" }, time: { type: "STRING" }, title: { type: "STRING" } }, required: ["day", "time", "title"] } }
+                };
+            }
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+                const result = await response.json();
+                return result.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (error) {
+                console.error("Gemini API call error:", error);
+                showStatusBox('ไม่สามารถติดต่อ Gemini API ได้', 'error');
+                return null;
+            }
+        }
+
+        async function callAppScript(payload) {
+            showLoader(true);
+            try {
+                const noAuthActions = ['requestOTP', 'verifyOTP'];
+                if (!noAuthActions.includes(payload.action)) {
+                    payload.sessionToken = localStorage.getItem('calendarSessionToken');
+                    payload.email = localStorage.getItem('calendarUserEmail');
+                }
+                const response = await fetch(appConfig.appScriptUrl, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload) 
+                });
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'error' && (result.message.includes('เซสชัน') || result.message.includes('ยืนยันตัวตน'))) {
+                   logout();
+                   throw new Error('Session invalid, logging out.');
+                }
+                return result;
+            } catch (error) {
+                console.error('API Call failed:', error);
+                throw error;
+            } finally {
+                showLoader(false);
+            }
+        }
+        
+        // =================================================================
+        // 4. AUTHENTICATION FUNCTIONS
+        // =================================================================
+        async function initializeApp() {
+            const storedEmail = localStorage.getItem('calendarUserEmail');
+            const storedToken = localStorage.getItem('calendarSessionToken');
+            if (storedEmail && storedToken) {
+                try {
+                    const response = await callAppScript({ action: 'verifySession', email: storedEmail, sessionToken: storedToken });
+                    if (response.status === 'success') {
+                        appState.userEmail = storedEmail;
+                        startApp();
+                        return;
+                    }
+                } catch (error) { /* Handled in callAppScript */ }
+            }
+            logout(false);
+        }
+
+        function logout(showMessage = true) {
+            localStorage.removeItem('calendarUserEmail');
+            localStorage.removeItem('calendarSessionToken');
+            appState.userEmail = null;
+            appState.events = [];
+            if (appState.autoRefreshInterval) clearInterval(appState.autoRefreshInterval);
+            if (appDom.appContainer) appDom.appContainer.classList.add('hidden');
+            if (appDom.loginModal) appDom.loginModal.classList.remove('hidden');
+            showLoginStep('email');
+            if (showMessage) showStatusBox('ออกจากระบบสำเร็จแล้ว');
+        }
+
+        async function handleEmailSubmit(e) {
+            e.preventDefault();
+            const email = appDom.userEmailInput.value;
+            if (!email) return;
+            try {
+                const response = await callAppScript({ action: 'requestOTP', email: email });
+                if (response.status === 'success') {
+                    appDom.otpEmailDisplay.textContent = email;
+                    showLoginStep('otp');
+                } else {
+                    showStatusBox(response.message || 'เกิดข้อผิดพลาดในการส่ง OTP', 'error');
+                }
+            } catch (error) {
+                showStatusBox('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            }
+        }
+
+        async function handleOtpSubmit(e) {
+            e.preventDefault();
+            const email = appDom.userEmailInput.value;
+            const otp = appDom.otpInput.value;
+            if (!email || !otp) return;
+            try {
+                const response = await callAppScript({ action: 'verifyOTP', email: email, otp: otp });
+                if (response.status === 'success' && response.sessionToken) {
+                    localStorage.setItem('calendarUserEmail', email);
+                    localStorage.setItem('calendarSessionToken', response.sessionToken);
+                    appState.userEmail = email;
+                    appDom.otpInput.value = '';
+                    startApp();
+                } else {
+                    showStatusBox(response.message || 'OTP ไม่ถูกต้อง', 'error');
+                }
+            } catch (error) {
+                showStatusBox('การยืนยัน OTP ล้มเหลว', 'error');
+            }
+        }
+
+        // =================================================================
+        // 5. CALENDAR FUNCTIONS
+        // =================================================================
+        function renderCalendar() {
+            updateMonthYearDisplay();
+            const { year, month } = { year: appState.currentDate.getFullYear(), month: appState.currentDate.getMonth() };
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            if (appDom.calendarBody) appDom.calendarBody.innerHTML = '';
+            if (appDom.calendarBodyMobile) appDom.calendarBodyMobile.innerHTML = '';
+            let date = 1;
+            for (let i = 0; i < 6; i++) {
+                if (date > daysInMonth) break;
+                for (let j = 0; j < 7; j++) {
+                    let cellNode;
+                    if (i === 0 && j < firstDay) {
+                        cellNode = createDayCell();
+                    } else if (date <= daysInMonth) {
+                        cellNode = createDayCell(new Date(year, month, date));
+                        date++;
+                    } else {
+                        cellNode = createDayCell();
+                    }
+                    if (cellNode) {
+                       if (appDom.calendarBody) appDom.calendarBody.appendChild(cellNode.cloneNode(true));
+                       if (appDom.calendarBodyMobile) appDom.calendarBodyMobile.appendChild(cellNode.cloneNode(true));
+                    }
+                }
+            }
+        }
+
+        function createDayCell(dateObj) {
+            const cell = document.createElement('div');
+            if (!dateObj) {
+                cell.className = 'bg-slate-50 rounded-lg';
+                return cell;
+            }
+            const day = dateObj.getDate();
+            const dateString = formatDate(dateObj);
+            cell.className = 'day-cell flex flex-col items-center justify-start p-1 sm:p-2 cursor-pointer rounded-lg relative';
+            cell.dataset.date = dateString;
+            const dateSpan = document.createElement('span');
+            dateSpan.textContent = day;
+            dateSpan.className = 'flex items-center justify-center w-7 h-7 rounded-full mb-1 sm:text-base text-xs';
+            if (dateString === formatDate(new Date())) {
+                cell.classList.add('bg-indigo-100');
+                dateSpan.classList.add('bg-indigo-600', 'text-white', 'font-bold');
+            } else {
+                cell.classList.add('bg-white', 'hover:bg-slate-100');
+            }
+            cell.appendChild(dateSpan);
+            const eventsForDay = appState.events.filter(e => e.date === dateString);
+            if (eventsForDay.length > 0) {
+                const dotsContainer = document.createElement('div');
+                dotsContainer.className = 'event-dots-container';
+                eventsForDay.slice(0, 3).forEach(event => {
+                    const dot = document.createElement('div');
+                    dot.className = `event-dot ${appConfig.categoryColors[event.category] || 'bg-slate-400'}`;
+                    dotsContainer.appendChild(dot);
+                });
+                cell.appendChild(dotsContainer);
+            }
+            return cell;
+        }
+
+        function updateMonthYearDisplay() {
+            const monthName = appConfig.thaiMonths[appState.currentDate.getMonth()];
+            const year = appState.currentDate.getFullYear() + 543;
+            const text = `${monthName} ${year}`;
+            if (appDom.monthYear) appDom.monthYear.textContent = text;
+            if (appDom.monthYearMobile) appDom.monthYearMobile.textContent = text;
+        }
+
+        function changeMonth(offset) {
+            appState.currentDate.setMonth(appState.currentDate.getMonth() + offset);
+            renderCalendar();
+        }
+        
+        // =================================================================
+        // 6. EVENT HANDLING FUNCTIONS
+        // =================================================================
+        async function fetchEvents(showLoader = true) {
+            if (!appState.userEmail) return;
+            try {
+                if(showLoader) showLoader(true);
+                const response = await callAppScript({ action: 'getReminders' });
+                if (response.status === 'success') {
+                    appState.events = response.data;
+                    renderCalendar();
+                    renderUpcoming();
+                }
+            } catch (error) { /* Handled */ } 
+            finally { if(showLoader) showLoader(false); }
+        }
+
+        async function saveEvent(e) {
+            e.preventDefault();
+            const eventId = appDom.eventId.value;
+            const payload = {
+                action: eventId ? 'updateReminder' : 'saveReminder',
+                id: eventId,
+                title: appDom.eventTitle.value,
+                category: appDom.eventCategory.value,
+                date: appDom.eventDate.value,
+                time: appDom.eventTime.value,
+                reminderOffset: appDom.reminderOffset.value,
+            };
+            try {
+                const response = await callAppScript(payload);
+                if (response.status === 'success') {
+                    toggleModal('event-modal', false);
+                    showStatusBox('บันทึกการแจ้งเตือนสำเร็จ');
+                    fetchEvents();
+                } else {
+                    showStatusBox(response.message || 'บันทึกไม่สำเร็จ', 'error');
+                }
+            } catch (error) {
+                showStatusBox('เกิดข้อผิดพลาดในการบันทึก', 'error');
+            }
+        }
+
+        async function deleteEvent(eventId) {
+            try {
+                const response = await callAppScript({ action: 'deleteReminder', id: eventId });
+                if (response.status === 'success') {
+                    showStatusBox('ลบการแจ้งเตือนแล้ว');
+                    fetchEvents();
+                } else {
+                    showStatusBox(response.message || 'ลบไม่สำเร็จ', 'error');
+                }
+            } catch(error) {
+                showStatusBox('เกิดข้อผิดพลาดในการลบ', 'error');
+            }
+        }
+
+        function openEventModal(event = null) {
+            appDom.eventForm.reset();
+            if (event) {
+                appDom.eventModalTitle.textContent = 'แก้ไขการแจ้งเตือน';
+                appDom.eventId.value = event.id;
+                appDom.eventTitle.value = event.title;
+                appDom.eventCategory.value = event.category;
+                appDom.eventDate.value = event.date;
+                appDom.eventTime.value = event.time;
+                appDom.reminderOffset.value = event.reminderOffset;
+            } else {
+                appDom.eventModalTitle.textContent = 'สร้างการแจ้งเตือนใหม่';
+                appDom.eventId.value = '';
+                if (appState.currentSelectedDate) {
+                    appDom.eventDate.value = appState.currentSelectedDate;
+                }
+            }
+            toggleModal('event-modal', true);
+        }
+
+        function openDailyModal(dateString) {
+            appState.currentSelectedDate = dateString;
+            const dateObj = new Date(dateString);
+            appDom.dailyEventsTitle.textContent = `วันที่ ${dateObj.getDate()} ${appConfig.thaiMonths[dateObj.getMonth()]} ${dateObj.getFullYear() + 543}`;
+            const eventsForDay = appState.events.filter(e => e.date === dateString).sort((a,b) => a.time.localeCompare(b.time));
+            const listEl = appDom.dailyEventsList;
+            listEl.innerHTML = '';
+            if (eventsForDay.length > 0) {
+                eventsForDay.forEach(event => listEl.appendChild(createEventListItem(event)));
+            } else {
+                listEl.innerHTML = '<p class="text-slate-500 text-center">ไม่มีการแจ้งเตือนสำหรับวันนี้</p>';
+            }
+            toggleModal('daily-events-modal', true);
+        }
+
+        function renderUpcoming() {
+            const listEl = appDom.upcomingEventsList;
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            const upcomingEvents = appState.events
+                .filter(e => new Date(`${e.date}T${e.time}`) >= new Date())
+                .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
+                .slice(0, 10);
+            if (upcomingEvents.length > 0) {
+                upcomingEvents.forEach(event => listEl.appendChild(createEventListItem(event, true)));
+            } else {
+                listEl.innerHTML = '<p class="text-slate-500 text-center p-4">ไม่มีการแจ้งเตือนที่กำลังจะมาถึง</p>';
+            }
+        }
+
+        function createEventListItem(event, isUpcoming = false) {
+            const item = document.createElement('div');
+            item.className = 'flex items-start space-x-3 p-3 bg-slate-50 rounded-lg';
+            item.innerHTML = `
+                <div class="w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${appConfig.categoryColors[event.category] || 'bg-slate-400'}"></div>
+                <div class="flex-1">
+                    <p class="font-semibold text-slate-800">${event.title}</p>
+                    <p class="text-sm text-slate-500">${isUpcoming ? `${new Date(event.date).getDate()} ${appConfig.thaiMonths[new Date(event.date).getMonth()]}` : ''} ${event.time} น.</p>
+                </div>
+                <div class="flex items-center space-x-1">
+                    <button class="p-1 text-slate-400 hover:text-indigo-600" data-action="editEvent" data-event-id="${event.id}">
+                        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z"></path></svg>
+                    </button>
+                    <button class="p-1 text-slate-400 hover:text-red-600" data-action="deleteEvent" data-event-id="${event.id}">
+                        <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>`;
+            return item;
+        }
+
+        // =================================================================
+        // 7. FEATURE FUNCTIONS
+        // =================================================================
+        async function handleGoalSubmit(e) {
+            e.preventDefault();
+            const idea = appDom.goalIdea.value;
+            if (!idea) return;
+            showLoader(true);
+            const prompt = `Based on the goal "${idea}", create a 7-day plan with specific, actionable tasks for a person in Thailand. Provide exactly 5-7 tasks for the upcoming week, starting from tomorrow. For each task, provide the day of the week (Monday, Tuesday, etc.), a suggested time (HH:MM format, e.g., 08:00, 19:30), and a short, clear title in Thai. Respond ONLY with a JSON array.`;
+            try {
+                const resultText = await callGemini(prompt, true);
+                if (resultText) {
+                    const suggestions = JSON.parse(resultText);
+                    appState.goalSuggestionsCache = suggestions;
+                    renderGoalSuggestions(suggestions);
+                }
+            } catch (error) {
+                console.error("Error parsing Gemini response:", error);
+                showStatusBox('ไม่สามารถสร้างแผนได้', 'error');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        function renderGoalSuggestions(suggestions) {
+            if (!appDom.goalSuggestions) return;
+            appDom.goalSuggestions.innerHTML = '';
+            if (suggestions && suggestions.length > 0) {
+                suggestions.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = 'p-3 bg-slate-100 rounded-lg text-left';
+                    item.innerHTML = `<p class="font-semibold text-teal-800">${s.title}</p><p class="text-sm text-slate-600">${translateDay(s.day)} - ${s.time} น.</p>`;
+                    appDom.goalSuggestions.appendChild(item);
+                });
+                if (appDom.goalResultSection) appDom.goalResultSection.classList.remove('hidden');
+            }
+        }
+
+        async function addGoalsToCalendar() {
+            if (appState.goalSuggestionsCache.length === 0) return;
+            showLoader(true);
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const eventsToAdd = appState.goalSuggestionsCache.map(suggestion => {
+                const targetDayIndex = appConfig.dayMap[suggestion.day];
+                if (targetDayIndex === undefined) return null;
+                const daysUntilTarget = (targetDayIndex - dayOfWeek + 7) % 7;
+                const offset = daysUntilTarget === 0 ? 7 : daysUntilTarget;
+                const eventDate = new Date();
+                eventDate.setDate(today.getDate() + offset);
+                return {
+                    action: 'saveReminder', title: suggestion.title, category: 'เป้าหมาย',
+                    date: formatDate(eventDate), time: suggestion.time, reminderOffset: '15'
+                };
+            }).filter(Boolean);
+            try {
+                const responses = await Promise.all(eventsToAdd.map(p => callAppScript(p)));
+                if (responses.every(res => res.status === 'success')) {
+                    showStatusBox('เพิ่มเป้าหมายลงในปฏิทินแล้ว!');
+                    toggleModal('goal-modal', false);
+                    fetchEvents();
+                } else {
+                    showStatusBox('เกิดข้อผิดพลาดในการบันทึกบางรายการ', 'error');
+                }
+            } catch (error) {
+                showStatusBox('เกิดข้อผิดพลาดในการบันทึกเป้าหมาย', 'error');
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        async function openSummaryModal() {
+            toggleModal('summary-modal', true);
+            appDom.summaryContent.innerHTML = '<p class="text-center">กำลังสร้างสรุป...</p>';
+            showLoader(true);
+            const today = new Date();
+            const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+            const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+            const eventsThisWeek = appState.events.filter(e => {
+                const eventDate = new Date(e.date);
+                return eventDate >= startOfWeek && eventDate <= endOfWeek;
+            });
+            if (eventsThisWeek.length < 3) {
+                appDom.summaryContent.innerHTML = '<p class="text-center text-slate-600">มีกิจกรรมน้อยเกินไปที่จะสร้างสรุป</p>';
+                showLoader(false);
+                return;
+            }
+            const eventListText = eventsThisWeek.map(e => `- ${e.date} ${e.time}: ${e.title} (หมวด: ${e.category})`).join('\n');
+            const prompt = `Here are my calendar events for this week in Thailand:\n${eventListText}\n\nAnalyze these events. Provide a friendly, encouraging summary in Thai. Highlight my productivity, suggest areas for better time management or work-life balance, and identify any patterns. Format the output using simple markdown with headings like '###' and paragraphs. Do not use lists.`;
+            try {
+                const resultText = await callGemini(prompt);
+                if(resultText) {
+                    appDom.summaryContent.innerHTML = resultText.replace(/### (.*)/g, '<h3>$1</h3>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                } else {
+                     appDom.summaryContent.innerHTML = '<p class="text-center text-red-500">ไม่สามารถสร้างสรุปได้</p>';
+                }
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // =================================================================
+        // 8. SEARCH AND ACCOUNT FUNCTIONS
+        // =================================================================
+        function performSearch(query) {
+            const upcomingList = appDom.upcomingEventsList;
+            const mobileResults = appDom.mobileSearchResults;
+            if (!query || query.length < 2) {
+                renderUpcoming();
+                if(mobileResults) mobileResults.innerHTML = '';
+                return;
+            }
+            const results = appState.events
+                .filter(e => e.title.toLowerCase().includes(query.toLowerCase()) || e.category.toLowerCase().includes(query.toLowerCase()))
+                .sort((a,b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
+            
+            if(upcomingList) upcomingList.innerHTML = '';
+            if(mobileResults) mobileResults.innerHTML = '';
+
+            if (results.length > 0) {
+                results.forEach(event => {
+                     const item = createEventListItem(event, true);
+                     if(upcomingList) upcomingList.appendChild(item.cloneNode(true));
+                     if(mobileResults) mobileResults.appendChild(item);
+                });
+            } else {
+                const noResult = '<p class="text-slate-500 text-center p-4">ไม่พบผลการค้นหา</p>';
+                if(upcomingList) upcomingList.innerHTML = noResult;
+                if(mobileResults) mobileResults.innerHTML = noResult;
+            }
+        }
+
+        async function confirmDelete() {
+             try {
+                const response = await callAppScript({ action: 'deleteUserAccount' });
+                if (response.status === 'success') {
+                    toggleModal('delete-confirm-modal', false);
+                    logout(false);
+                    setTimeout(() => showStatusBox('บัญชีของคุณถูกลบเรียบร้อยแล้ว'), 500);
+                } else {
+                    showStatusBox(response.message || 'ลบบัญชีไม่สำเร็จ', 'error');
+                }
+            } catch (error) {
+                showStatusBox('เกิดข้อผิดพลาดในการลบบัญชี', 'error');
+            }
+        }
+
+        // =================================================================
+        // 9. UTILITY FUNCTIONS
+        // =================================================================
+        function formatDate(date) { return date.toISOString().split('T')[0]; }
+        
+        function translateDay(day) {
+            const map = { Monday: "วันจันทร์", Tuesday: "วันอังคาร", Wednesday: "วันพุธ", Thursday: "วันพฤหัสบดี", Friday: "วันศุกร์", Saturday: "วันเสาร์", Sunday: "วันอาทิตย์"};
+            return map[day] || day;
+        }
+
+        // =================================================================
+        // 10. APP INITIALIZATION
+        // =================================================================
+        function setupEventListeners() {
+            document.body.addEventListener('click', e => {
+                const target = e.target.closest('[data-action]');
+                if (!target) return;
+                const action = target.dataset.action;
+                const eventId = target.dataset.eventId;
+                const handlers = {
+                    prevMonth: () => changeMonth(-1),
+                    nextMonth: () => changeMonth(1),
+                    logout: () => logout(),
+                    backToEmail: () => showLoginStep('email'),
+                    openGoalModal: () => toggleModal('goal-modal', true),
+                    openSummaryModal: () => openSummaryModal(),
+                    openSearchModal: () => toggleModal('search-modal', true),
+                    openDeleteConfirm: () => toggleModal('delete-confirm-modal', true),
+                    confirmDelete: () => confirmDelete(),
+                    addGoalsToCalendar: () => addGoalsToCalendar(),
+                    addNewEventFromList: () => {
+                        toggleModal('daily-events-modal', false);
+                        openEventModal();
+                    },
+                    closeModal: () => toggleModal(target.dataset.target, false),
+                    editEvent: () => {
+                        const eventToEdit = appState.events.find(e => e.id === eventId);
+                        if (eventToEdit) openEventModal(eventToEdit);
+                    },
+                    deleteEvent: () => deleteEvent(eventId)
+                };
+                if (handlers[action]) handlers[action]();
+            });
+
+            const handleDayClick = e => {
+                const cell = e.target.closest('.day-cell[data-date]');
+                if (cell) openDailyModal(cell.dataset.date);
+            };
+            if(appDom.calendarBody) appDom.calendarBody.addEventListener('click', handleDayClick);
+            if(appDom.calendarBodyMobile) appDom.calendarBodyMobile.addEventListener('click', handleDayClick);
+
+            if(appDom.emailForm) appDom.emailForm.addEventListener('submit', handleEmailSubmit);
+            if(appDom.otpForm) appDom.otpForm.addEventListener('submit', handleOtpSubmit);
+            if(appDom.eventForm) appDom.eventForm.addEventListener('submit', saveEvent);
+            if(appDom.goalForm) appDom.goalForm.addEventListener('submit', handleGoalSubmit);
+            
+            if(appDom.searchInput) appDom.searchInput.addEventListener('input', e => performSearch(e.target.value));
+            if(appDom.mobileSearchInput) appDom.mobileSearchInput.addEventListener('input', e => performSearch(e.target.value));
+        }
+
+        function startApp() {
+            if(appDom.loginModal) appDom.loginModal.classList.add('hidden');
+            if(appDom.appContainer) appDom.appContainer.classList.remove('hidden');
+            if(appDom.displayEmailSidebar) appDom.displayEmailSidebar.textContent = appState.userEmail;
+            if(appDom.displayEmailMobile) appDom.displayEmailMobile.textContent = appState.userEmail;
+            fetchEvents();
+            if (appState.autoRefreshInterval) clearInterval(appState.autoRefreshInterval);
+            appState.autoRefreshInterval = setInterval(() => fetchEvents(false), 60000);
+        }
+
+        function init() {
+            const allDomIds = [
+                'global-loader', 'login-modal', 'app-container', 'email-step', 'otp-step', 'email-form', 'otp-form', 'user-email-input', 
+                'otp-input', 'otp-email-display', 'display-email-sidebar', 'display-email-mobile', 'delete-confirm-modal', 'month-year', 
+                'calendar-body', 'event-modal', 'event-form', 'daily-events-modal', 'daily-events-list', 'goal-modal', 'goal-form', 
+                'goal-idea', 'goal-result-section', 'goal-suggestions', 'add-goals-to-calendar-btn', 'summary-modal', 'summary-content', 
+                'upcoming-events-list', 'search-input', 'mobile-calendar-view', 'calendar-body-mobile', 'month-year-mobile', 
+                'daily-events-title', 'event-modal-title', 'event-id', 'event-title', 'event-category', 'event-date', 'event-time', 
+                'reminder-offset', 'status-box', 'status-text', 'search-modal', 'mobile-search-input', 'mobile-search-results', 
+                'confirm-delete-btn'
+            ];
+            allDomIds.forEach(id => {
+                appDom[id.replace(/-(\w)/g, (_, p1) => p1.toUpperCase())] = document.getElementById(id);
+            });
+            setupEventListeners();
+            initializeApp();
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+</body>
+</html>
+
